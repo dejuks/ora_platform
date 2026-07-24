@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class UserModuleRole extends Model
+{
+    protected $fillable = [
+        'user_id',
+        'module_id',
+        'role_id',
+        'is_active',
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function module()
+    {
+        return $this->belongsTo(Module::class);
+    }
+
+    public function role()
+    {
+        return $this->belongsTo(Role::class);
+    }
+}

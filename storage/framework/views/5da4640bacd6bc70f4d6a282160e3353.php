@@ -1,0 +1,1 @@
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/components/footer.blade.php ENDPATH**/ ?>
