@@ -18,6 +18,8 @@ class Module extends Model
         'route',
         'description',
         'is_active',
+        'is_self_registerable',
+        'default_role_slug',
         'created_by',
         'updated_by',
     ];
@@ -26,6 +28,7 @@ class Module extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_self_registerable' => 'boolean',
         ];
     }
 
@@ -58,6 +61,21 @@ class Module extends Model
     public function roles()
     {
         return $this->hasMany(Role::class);
+    }
+
+    /**
+     * The Role this module grants to a user who self-registers into
+     * it — resolved from default_role_slug, scoped to this module.
+     */
+    public function defaultRole()
+    {
+        if (! $this->default_role_slug) {
+            return null;
+        }
+
+        return $this->roles()
+            ->where('slug', $this->default_role_slug)
+            ->first();
     }
 
     /**
@@ -94,5 +112,15 @@ class Module extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Modules offered as checkboxes on the public registration form
+     * and on the "My Modules" self-service page.
+     */
+    public function scopeSelfRegisterable($query)
+    {
+        return $query->where('is_active', true)
+            ->where('is_self_registerable', true);
     }
 }
