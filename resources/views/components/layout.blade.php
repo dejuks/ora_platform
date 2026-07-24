@@ -36,6 +36,8 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
   <!-- Template Main CSS File -->
   <link href="{{ asset('assets/css/main.css') }}" rel="stylesheet">
 
+  @stack('styles')
+
   <!-- =======================================================
     * Template Name: AppDashboard - Bootstrap Admin Dashboard Template
     * Template URL: https://bootstrapmade.com/appdashboard-bootstrap-admin-dashboard-template/
@@ -403,8 +405,11 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
   <script src="{{ asset('assets/js/apps-sidebar-toggle.js') }}"></script>
 
   <script>
-    // Revenue Overview Chart
+    // Revenue Overview Chart (only on pages that actually have it)
     document.addEventListener('DOMContentLoaded', function() {
+      if (!document.querySelector('#revenueChart')) {
+        return;
+      }
       const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
       const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim();
       const warningColor = getComputedStyle(document.documentElement).getPropertyValue('--warning-color').trim();
@@ -537,6 +542,8 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
       });
     });
   </script>
+
+  @stack('scripts')
 </body>
 
 </html>

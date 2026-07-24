@@ -1,18 +1,96 @@
 <x-layout>
 
+  @push('styles')
+    <style>
+      .module-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: var(--spacing-lg, 1.375rem);
+        margin-bottom: var(--spacing-xl, 2.125rem);
+      }
+      .module-card {
+        background: var(--surface-color);
+        border: 1px solid var(--border-color);
+        border-radius: var(--radius-lg, 0.625rem);
+        padding: 1.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.85rem;
+        transition: var(--transition-base, 220ms ease);
+        text-decoration: none;
+        color: inherit;
+      }
+      .module-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+        color: inherit;
+      }
+      .module-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .module-card-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md, 0.5rem);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: color-mix(in srgb, var(--accent-color) 12%, transparent);
+        color: var(--accent-color);
+        font-size: 1.2rem;
+      }
+      .module-card-title {
+        font-weight: 600;
+        color: var(--heading-color);
+        margin: 0;
+        font-size: 1.02rem;
+      }
+      .module-card-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+      }
+      .module-card-metric strong {
+        display: block;
+        font-size: 1.35rem;
+        color: var(--heading-color);
+        line-height: 1.1;
+      }
+      .module-card-metric span {
+        font-size: 0.78rem;
+        color: var(--muted-color);
+      }
+      .module-card-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.82rem;
+        color: var(--muted-color);
+        border-top: 1px dashed var(--border-color);
+        padding-top: 0.75rem;
+      }
+      .module-card-footer .open-link {
+        color: var(--accent-color);
+        font-weight: 600;
+      }
+    </style>
+  @endpush
+
   <div class="main-content page-dashboard">
       <div class="dashboard-hero">
         <div class="dashboard-hero-copy">
           <span class="dashboard-eyebrow">Command Center</span>
-          <h1>Operating dashboard</h1>
-          <p>Monitor revenue, orders, customer movement, and priority workflow signals from one focused workspace.</p>
+          <h1>Super Admin Dashboard</h1>
+          <p>A live rollup of users and activity across every module in the platform.</p>
         </div>
         <div class="dashboard-hero-actions">
-          <a href="invoice-list.html" class="btn btn-light">
-            <i class="bi bi-receipt"></i>
-            Invoices
+          <a href="{{ route('admin.modules.index') }}" class="btn btn-light">
+            <i class="bi bi-grid"></i>
+            Modules
           </a>
-          <a href="users.html" class="btn btn-primary">
+          <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
             <i class="bi bi-person-plus"></i>
             Add User
           </a>
@@ -21,76 +99,96 @@
         <div class="dashboard-kpi-grid">
           <div class="dashboard-kpi-card">
             <div class="dashboard-kpi-icon primary">
-              <i class="bi bi-cart3"></i>
+              <i class="bi bi-people"></i>
             </div>
             <div class="dashboard-kpi-content">
-              <span>Total Sales</span>
-              <strong>$12,426</strong>
-              <small class="positive"><i class="bi bi-arrow-up"></i> 12.5% vs last month</small>
-            </div>
-          </div>
-          <div class="dashboard-kpi-card">
-            <div class="dashboard-kpi-icon success">
-              <i class="bi bi-currency-dollar"></i>
-            </div>
-            <div class="dashboard-kpi-content">
-              <span>Revenue</span>
-              <strong>$8,234</strong>
-              <small class="positive"><i class="bi bi-arrow-up"></i> 8.2% vs last month</small>
+              <span>Total Users</span>
+              <strong>{{ number_format($stats['total_users']) }}</strong>
+              <small class="positive"><i class="bi bi-check-circle"></i> {{ number_format($stats['active_users']) }} active</small>
             </div>
           </div>
           <div class="dashboard-kpi-card">
             <div class="dashboard-kpi-icon warning">
-              <i class="bi bi-box-seam"></i>
+              <i class="bi bi-person-dash"></i>
             </div>
             <div class="dashboard-kpi-content">
-              <span>Orders</span>
-              <strong>1,248</strong>
-              <small class="negative"><i class="bi bi-arrow-down"></i> 3.1% vs last month</small>
+              <span>Inactive Users</span>
+              <strong>{{ number_format($stats['inactive_users']) }}</strong>
+              <small>of {{ number_format($stats['total_users']) }} total</small>
             </div>
           </div>
           <div class="dashboard-kpi-card">
             <div class="dashboard-kpi-icon info">
-              <i class="bi bi-people"></i>
+              <i class="bi bi-grid-3x3-gap"></i>
             </div>
             <div class="dashboard-kpi-content">
-              <span>Customers</span>
-              <strong>5,432</strong>
-              <small class="positive"><i class="bi bi-arrow-up"></i> 5.8% vs last month</small>
+              <span>Modules</span>
+              <strong>{{ $stats['total_modules'] }}</strong>
+              <small class="positive"><i class="bi bi-arrow-up"></i> {{ $stats['active_modules'] }} active</small>
+            </div>
+          </div>
+          <div class="dashboard-kpi-card">
+            <div class="dashboard-kpi-icon success">
+              <i class="bi bi-shield-lock"></i>
+            </div>
+            <div class="dashboard-kpi-content">
+              <span>Super Admins</span>
+              <strong>{{ $stats['super_admins'] }}</strong>
+              <small>full-system access</small>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Per-module summary cards -->
+      <div class="module-grid">
+        @foreach($moduleCards as $module)
+          @php $link = $module['route'] ? route($module['route']) : null; @endphp
+          <a href="{{ $link ?? '#' }}" class="module-card" @if(!$link) onclick="return false;" style="opacity:.7;cursor:default;" @endif>
+            <div class="module-card-head">
+              <span class="module-card-icon"><i class="bi {{ $module['icon'] }}"></i></span>
+              <span class="badge {{ $module['is_active'] ? 'badge-soft-success' : 'badge-soft-secondary' }}">
+                {{ $module['is_active'] ? 'Active' : 'Inactive' }}
+              </span>
+            </div>
+            <h3 class="module-card-title">{{ $module['name'] }}</h3>
+            <div class="module-card-meta">
+              <div class="module-card-metric">
+                <strong>{{ number_format($module['total']) }}</strong>
+                <span>{{ $module['total_label'] }}</span>
+              </div>
+              <div class="module-card-metric">
+                <strong>{{ number_format($module['secondary']) }}</strong>
+                <span>{{ $module['secondary_label'] }}</span>
+              </div>
+              <div class="module-card-metric">
+                <strong>{{ number_format($module['members']) }}</strong>
+                <span>Members</span>
+              </div>
+            </div>
+            <div class="module-card-footer">
+              <span>{{ $module['code'] }}</span>
+              @if($link)
+                <span class="open-link">Open dashboard <i class="bi bi-arrow-right"></i></span>
+              @else
+                <span>No dashboard yet</span>
+              @endif
+            </div>
+          </a>
+        @endforeach
       </div>
 
       <div class="dashboard-workbench">
         <section class="dashboard-panel dashboard-chart-panel">
           <div class="dashboard-panel-header">
             <div>
-              <span class="dashboard-section-kicker">Financial pulse</span>
-              <h2>Revenue Overview</h2>
+              <span class="dashboard-section-kicker">Growth</span>
+              <h2>User Registrations</h2>
             </div>
-            <div class="dashboard-segmented">
-              <button class="active">12M</button>
-              <button>6M</button>
-              <button>30D</button>
-            </div>
-          </div>
-          <div class="dashboard-chart-summary">
-            <div>
-              <span>Revenue</span>
-              <strong>$10.2k</strong>
-            </div>
-            <div>
-              <span>Expenses</span>
-              <strong>$5.1k</strong>
-            </div>
-            <div>
-              <span>Customers</span>
-              <strong>3.8k</strong>
-            </div>
+            <span class="dashboard-panel-note">Last 12 months</span>
           </div>
           <div class="dashboard-chart-wrap">
-            <div class="chart-container" id="revenueChart"></div>
+            <div class="chart-container" id="userGrowthChart"></div>
           </div>
         </section>
 
@@ -98,165 +196,28 @@
           <section class="dashboard-panel dashboard-activity-panel">
             <div class="dashboard-panel-header compact">
               <div>
-                <span class="dashboard-section-kicker">Live queue</span>
-                <h2>Recent Activity</h2>
-              </div>
-              <a href="activity.html">View all</a>
-            </div>
-            <div class="dashboard-activity-list">
-              <div class="dashboard-activity-item">
-                <span class="dashboard-activity-icon success"><i class="bi bi-check-lg"></i></span>
-                <div>
-                  <strong>New order received <a href="#">#ORD-001</a></strong>
-                  <small>5 minutes ago</small>
-                </div>
-              </div>
-              <div class="dashboard-activity-item">
-                <span class="dashboard-activity-icon primary"><i class="bi bi-person-plus"></i></span>
-                <div>
-                  <strong>New user registered <a href="#">John Doe</a></strong>
-                  <small>15 minutes ago</small>
-                </div>
-              </div>
-              <div class="dashboard-activity-item">
-                <span class="dashboard-activity-icon warning"><i class="bi bi-exclamation-triangle"></i></span>
-                <div>
-                  <strong>Server CPU usage at 85%</strong>
-                  <small>1 hour ago</small>
-                </div>
-              </div>
-              <div class="dashboard-activity-item">
-                <span class="dashboard-activity-icon info"><i class="bi bi-chat-dots"></i></span>
-                <div>
-                  <strong>New comment on <a href="#">blog post</a></strong>
-                  <small>2 hours ago</small>
-                </div>
-              </div>
-              <div class="dashboard-activity-item">
-                <span class="dashboard-activity-icon danger"><i class="bi bi-x-circle"></i></span>
-                <div>
-                  <strong>Order <a href="#">#ORD-004</a> cancelled</strong>
-                  <small>3 hours ago</small>
-                </div>
+                <span class="dashboard-section-kicker">Distribution</span>
+                <h2>Members by Module</h2>
               </div>
             </div>
-          </section>
-
-          <section class="dashboard-panel dashboard-actions-panel">
-            <div class="dashboard-panel-header compact">
-              <div>
-                <span class="dashboard-section-kicker">Shortcuts</span>
-                <h2>Quick Actions</h2>
-              </div>
-            </div>
-            <div class="dashboard-action-grid">
-              <a href="#" class="dashboard-action-item">
-                <i class="bi bi-plus-circle"></i>
-                <span>New Order</span>
-              </a>
-              <a href="users-edit.html" class="dashboard-action-item">
-                <i class="bi bi-person-plus"></i>
-                <span>Add User</span>
-              </a>
-              <a href="invoice.html" class="dashboard-action-item">
-                <i class="bi bi-file-earmark-text"></i>
-                <span>Report</span>
-              </a>
-              <a href="settings.html" class="dashboard-action-item">
-                <i class="bi bi-gear"></i>
-                <span>Settings</span>
-              </a>
+            <div class="dashboard-chart-wrap">
+              <div class="chart-container" id="membersByModuleChart"></div>
             </div>
           </section>
         </aside>
       </div>
 
       <div class="dashboard-insight-grid">
-        <section class="dashboard-panel dashboard-funnel-panel">
+        <section class="dashboard-panel dashboard-funnel-panel" style="grid-column: span 2;">
           <div class="dashboard-panel-header compact">
             <div>
-              <span class="dashboard-section-kicker">Pipeline</span>
-              <h2>Conversion Funnel</h2>
+              <span class="dashboard-section-kicker">Volume</span>
+              <h2>Content by Module</h2>
             </div>
-            <span class="dashboard-panel-note">7 days</span>
+            <span class="dashboard-panel-note">All-time</span>
           </div>
-          <div class="dashboard-funnel-list">
-            <div class="dashboard-funnel-item">
-              <div>
-                <span>Visitors</span>
-                <strong>24,800</strong>
-                <small>100% converted</small>
-              </div>
-              <div class="dashboard-funnel-track full"><span></span></div>
-            </div>
-            <div class="dashboard-funnel-item">
-              <div>
-                <span>Signups</span>
-                <strong>6,420</strong>
-                <small>26% converted</small>
-              </div>
-              <div class="dashboard-funnel-track high"><span></span></div>
-            </div>
-            <div class="dashboard-funnel-item">
-              <div>
-                <span>Trials</span>
-                <strong>2,180</strong>
-                <small>34% converted</small>
-              </div>
-              <div class="dashboard-funnel-track medium"><span></span></div>
-            </div>
-            <div class="dashboard-funnel-item">
-              <div>
-                <span>Paid</span>
-                <strong>684</strong>
-                <small>31% converted</small>
-              </div>
-              <div class="dashboard-funnel-track low"><span></span></div>
-            </div>
-          </div>
-        </section>
-
-        <section class="dashboard-panel dashboard-products-panel">
-          <div class="dashboard-panel-header compact">
-            <div>
-              <span class="dashboard-section-kicker">Revenue mix</span>
-              <h2>Top Products</h2>
-            </div>
-            <a href="invoice-list.html">Details</a>
-          </div>
-          <div class="dashboard-product-list">
-            <div class="dashboard-product-item">
-              <span class="dashboard-product-rank">1</span>
-              <div>
-                <strong>Enterprise Plan</strong>
-                <small>$42.8k revenue</small>
-              </div>
-              <em class="positive">+18.4%</em>
-            </div>
-            <div class="dashboard-product-item">
-              <span class="dashboard-product-rank">2</span>
-              <div>
-                <strong>Premium Plan</strong>
-                <small>$27.3k revenue</small>
-              </div>
-              <em class="positive">+12.1%</em>
-            </div>
-            <div class="dashboard-product-item">
-              <span class="dashboard-product-rank">3</span>
-              <div>
-                <strong>Team Add-ons</strong>
-                <small>$14.6k revenue</small>
-              </div>
-              <em class="positive">+7.8%</em>
-            </div>
-            <div class="dashboard-product-item">
-              <span class="dashboard-product-rank">4</span>
-              <div>
-                <strong>Support Seats</strong>
-                <small>$9.2k revenue</small>
-              </div>
-              <em class="negative">-2.4%</em>
-            </div>
+          <div class="dashboard-chart-wrap">
+            <div class="chart-container" id="contentByModuleChart"></div>
           </div>
         </section>
 
@@ -264,39 +225,21 @@
           <div class="dashboard-panel-header compact">
             <div>
               <span class="dashboard-section-kicker">Reliability</span>
-              <h2>System Status</h2>
+              <h2>Module Status</h2>
             </div>
-            <span class="badge badge-soft-success">Operational</span>
           </div>
-          <div class="dashboard-status-grid">
-            <div class="dashboard-status-item">
-              <span class="dashboard-status-dot success"></span>
-              <div>
-                <strong>99.98%</strong>
-                <small>API Uptime</small>
+          <div class="dashboard-activity-list">
+            @foreach($moduleCards as $module)
+              <div class="dashboard-activity-item">
+                <span class="dashboard-activity-icon {{ $module['is_active'] ? 'success' : 'warning' }}">
+                  <i class="bi {{ $module['icon'] }}"></i>
+                </span>
+                <div>
+                  <strong>{{ $module['name'] }}</strong>
+                  <small>{{ $module['is_active'] ? 'Active' : 'Inactive' }} &middot; {{ $module['members'] }} members</small>
+                </div>
               </div>
-            </div>
-            <div class="dashboard-status-item">
-              <span class="dashboard-status-dot primary"></span>
-              <div>
-                <strong>0.08%</strong>
-                <small>Error Rate</small>
-              </div>
-            </div>
-            <div class="dashboard-status-item">
-              <span class="dashboard-status-dot info"></span>
-              <div>
-                <strong>124ms</strong>
-                <small>Latency</small>
-              </div>
-            </div>
-            <div class="dashboard-status-item">
-              <span class="dashboard-status-dot success"></span>
-              <div>
-                <strong>0</strong>
-                <small>Incidents</small>
-              </div>
-            </div>
+            @endforeach
           </div>
         </section>
       </div>
@@ -305,120 +248,177 @@
         <section class="dashboard-panel dashboard-orders-panel">
           <div class="dashboard-panel-header">
             <div>
-              <span class="dashboard-section-kicker">Commerce stream</span>
-              <h2>Recent Orders</h2>
+              <span class="dashboard-section-kicker">Latest signups</span>
+              <h2>Recent Users</h2>
             </div>
-            <a href="invoice-list.html" class="btn btn-sm btn-primary">View All</a>
+            <a href="{{ route('admin.users.index') }}" class="btn btn-sm btn-primary">View All</a>
           </div>
           <div class="dashboard-orders-table">
             <table class="table">
               <thead>
                 <tr>
-                  <th>Order</th>
-                  <th>Customer</th>
-                  <th>Product</th>
-                  <th>Amount</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
                   <th>Status</th>
+                  <th>Joined</th>
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td><a href="#">#ORD-001</a></td>
-                  <td>
-                    <div class="dashboard-table-user">
-                      <img src="assets/img/avatars/avatar-1.webp" alt="">
-                      <div>
-                        <strong>John Doe</strong>
-                        <span><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a3c9cccbcde3c6dbc2ced3cfc68dc0ccce">[email&#160;protected]</a></span>
+                @forelse($recentUsers as $user)
+                  <tr>
+                    <td>
+                      <div class="dashboard-table-user">
+                        <div>
+                          <strong>{{ $user->full_name }}</strong>
+                          @if($user->is_super_admin)
+                            <span class="badge badge-soft-danger">Super Admin</span>
+                          @endif
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>Premium Plan</td>
-                  <td>$299.00</td>
-                  <td><span class="badge badge-soft-success">Completed</span></td>
-                </tr>
-                <tr>
-                  <td><a href="#">#ORD-002</a></td>
-                  <td>
-                    <div class="dashboard-table-user">
-                      <img src="assets/img/avatars/avatar-2.webp" alt="">
-                      <div>
-                        <strong>Jane Smith</strong>
-                        <span><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="b1dbd0dfd4f1d4c9d0dcc1ddd49fd2dedc">[email&#160;protected]</a></span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>Basic Plan</td>
-                  <td>$99.00</td>
-                  <td><span class="badge badge-soft-warning">Pending</span></td>
-                </tr>
-                <tr>
-                  <td><a href="#">#ORD-003</a></td>
-                  <td>
-                    <div class="dashboard-table-user">
-                      <img src="assets/img/avatars/avatar-3.webp" alt="">
-                      <div>
-                        <strong>Mike Johnson</strong>
-                        <span><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bdd0d4d6d8fdd8c5dcd0cdd1d893ded2d0">[email&#160;protected]</a></span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>Enterprise Plan</td>
-                  <td>$999.00</td>
-                  <td><span class="badge badge-soft-success">Completed</span></td>
-                </tr>
-                <tr>
-                  <td><a href="#">#ORD-004</a></td>
-                  <td>
-                    <div class="dashboard-table-user">
-                      <img src="assets/img/avatars/avatar-4.webp" alt="">
-                      <div>
-                        <strong>Sarah Wilson</strong>
-                        <span><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3b485a495a537b5e435a564b575e15585456">[email&#160;protected]</a></span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>Basic Plan</td>
-                  <td>$99.00</td>
-                  <td><span class="badge badge-soft-danger">Cancelled</span></td>
-                </tr>
+                    </td>
+                    <td>{{ $user->username }}</td>
+                    <td>{{ $user->email }}</td>
+                    <td>
+                      <span class="badge {{ $user->status === 'Active' ? 'badge-soft-success' : 'badge-soft-secondary' }}">
+                        {{ $user->status }}
+                      </span>
+                    </td>
+                    <td>{{ $user->created_at->diffForHumans() }}</td>
+                  </tr>
+                @empty
+                  <tr>
+                    <td colspan="5" class="text-center text-muted">No users yet.</td>
+                  </tr>
+                @endforelse
               </tbody>
             </table>
           </div>
         </section>
 
-        <section class="dashboard-panel dashboard-targets-panel">
+        <section class="dashboard-panel dashboard-actions-panel">
           <div class="dashboard-panel-header compact">
             <div>
-              <span class="dashboard-section-kicker">Plan health</span>
-              <h2>Sales Targets</h2>
+              <span class="dashboard-section-kicker">Shortcuts</span>
+              <h2>Quick Actions</h2>
             </div>
           </div>
-          <div class="dashboard-target-list">
-            <div class="dashboard-target-item">
-              <div>
-                <span>Product Sales</span>
-                <strong>75%</strong>
-              </div>
-              <div class="dashboard-target-track"><span style="width: 75%"></span></div>
-            </div>
-            <div class="dashboard-target-item">
-              <div>
-                <span>Service Revenue</span>
-                <strong>60%</strong>
-              </div>
-              <div class="dashboard-target-track success"><span style="width: 60%"></span></div>
-            </div>
-            <div class="dashboard-target-item">
-              <div>
-                <span>New Customers</span>
-                <strong>85%</strong>
-              </div>
-              <div class="dashboard-target-track warning"><span style="width: 85%"></span></div>
-            </div>
+          <div class="dashboard-action-grid">
+            <a href="{{ route('admin.users.index') }}" class="dashboard-action-item">
+              <i class="bi bi-people"></i>
+              <span>Users</span>
+            </a>
+            <a href="{{ route('admin.modules.index') }}" class="dashboard-action-item">
+              <i class="bi bi-grid"></i>
+              <span>Modules</span>
+            </a>
+            <a href="{{ route('admin.roles.index') }}" class="dashboard-action-item">
+              <i class="bi bi-diagram-3"></i>
+              <span>Roles</span>
+            </a>
+            <a href="{{ route('admin.permissions.index') }}" class="dashboard-action-item">
+              <i class="bi bi-key"></i>
+              <span>Permissions</span>
+            </a>
           </div>
         </section>
       </div>
     </div>
+
+  @push('scripts')
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const styles = getComputedStyle(document.documentElement);
+        const accent = styles.getPropertyValue('--accent-color').trim();
+        const success = styles.getPropertyValue('--success-color').trim();
+        const warning = styles.getPropertyValue('--warning-color').trim();
+        const danger = styles.getPropertyValue('--danger-color').trim();
+        const info = styles.getPropertyValue('--info-color').trim();
+        const border = styles.getPropertyValue('--border-color').trim();
+        const muted = styles.getPropertyValue('--muted-color').trim();
+        const palette = [accent, success, warning, danger, info, '#7c5cf0'];
+
+        // --- User Registrations (area chart) ---
+        const growthLabels = @json($userGrowth['labels']);
+        const growthData = @json($userGrowth['data']);
+
+        const growthChart = new ApexCharts(document.querySelector('#userGrowthChart'), {
+          series: [{ name: 'New Users', data: growthData }],
+          chart: { type: 'area', height: 330, fontFamily: 'inherit', toolbar: { show: false }, zoom: { enabled: false } },
+          colors: [accent],
+          dataLabels: { enabled: false },
+          stroke: { curve: 'smooth', width: 2.5 },
+          fill: {
+            type: 'gradient',
+            gradient: { shadeIntensity: 1, opacityFrom: 0.34, opacityTo: 0.06, stops: [0, 90, 100] }
+          },
+          xaxis: {
+            categories: growthLabels,
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            labels: { style: { colors: muted, fontSize: '12px' } }
+          },
+          yaxis: {
+            labels: {
+              style: { colors: muted, fontSize: '12px' },
+              formatter: function (value) { return Math.round(value); }
+            }
+          },
+          grid: { borderColor: border, strokeDashArray: 4, xaxis: { lines: { show: false } } },
+          tooltip: { y: { formatter: function (value) { return value + ' new user' + (value === 1 ? '' : 's'); } } }
+        });
+        growthChart.render();
+
+        // --- Members by Module (donut) ---
+        const membersLabels = @json($usersByModule['labels']);
+        const membersData = @json($usersByModule['data']);
+
+        new ApexCharts(document.querySelector('#membersByModuleChart'), {
+          series: membersData,
+          labels: membersLabels,
+          chart: { type: 'donut', height: 300, fontFamily: 'inherit' },
+          colors: palette,
+          legend: { position: 'bottom', fontSize: '12px' },
+          dataLabels: { enabled: false },
+          plotOptions: {
+            pie: {
+              donut: {
+                labels: {
+                  show: true,
+                  total: { show: true, label: 'Total Members' }
+                }
+              }
+            }
+          },
+          tooltip: { y: { formatter: function (value) { return value + ' member' + (value === 1 ? '' : 's'); } } }
+        }).render();
+
+        // --- Content by Module (bar) ---
+        const contentLabels = @json($contentByModule['labels']);
+        const contentData = @json($contentByModule['data']);
+
+        new ApexCharts(document.querySelector('#contentByModuleChart'), {
+          series: [{ name: 'Items', data: contentData }],
+          chart: { type: 'bar', height: 300, fontFamily: 'inherit', toolbar: { show: false } },
+          plotOptions: {
+            bar: { borderRadius: 6, columnWidth: '45%', distributed: true }
+          },
+          colors: palette,
+          dataLabels: { enabled: false },
+          legend: { show: false },
+          xaxis: {
+            categories: contentLabels,
+            axisBorder: { show: false },
+            axisTicks: { show: false },
+            labels: { style: { colors: muted, fontSize: '12px' } }
+          },
+          yaxis: {
+            labels: { style: { colors: muted, fontSize: '12px' }, formatter: function (value) { return Math.round(value); } }
+          },
+          grid: { borderColor: border, strokeDashArray: 4, xaxis: { lines: { show: false } } }
+        }).render();
+      });
+    </script>
+  @endpush
 
 </x-layout>
