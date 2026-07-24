@@ -400,6 +400,110 @@
             .hero svg.network circle, .hero svg.network line{ animation: none !important; }
         }
 
+        /* ---------------- Step indicator ---------------- */
+
+        .step-indicator{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 22px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+
+        .step-indicator .dot{
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--line);
+        }
+
+        .step-indicator .dot.active{
+            background: var(--navy-2);
+        }
+
+        .step-indicator .sep{
+            width: 22px;
+            height: 1px;
+            background: var(--line);
+        }
+
+        /* ---------------- Confirmation step ---------------- */
+
+        .review-card{
+            border: 1.4px solid var(--line);
+            border-radius: 10px;
+            padding: 16px 18px;
+            margin-bottom: 18px;
+            background: #fff;
+        }
+
+        .review-card dl{
+            margin: 0;
+            display: grid;
+            grid-template-columns: 90px 1fr;
+            row-gap: 8px;
+        }
+
+        .review-card dt{
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .review-card dd{
+            margin: 0;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .review-modules-label{
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--ink);
+            margin: 6px 0 10px;
+        }
+
+        .review-modules-list{
+            list-style: none;
+            margin: 0 0 4px;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .review-modules-list li{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13.5px;
+            color: var(--ink);
+        }
+
+        .review-modules-list li i{
+            color: var(--green);
+        }
+
+        .btn-back{
+            width: 100%;
+            border: 1.4px solid var(--line);
+            border-radius: 999px;
+            padding: 11px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--muted);
+            background: #fff;
+            margin-top: 10px;
+            transition: 0.15s ease;
+        }
+
+        .btn-back:hover{
+            border-color: var(--navy-2);
+            color: var(--navy-2);
+        }
+
     </style>
 
 </head>
@@ -407,7 +511,7 @@
 <body>
 
 <div class="topbar">
-    <a class="brand" href="{{ route('register') }}">
+    <a class="brand" href="{{ route('portal') }}">
         <img class="brand-mark" src="{{ asset('assets/img/ora-logo.png') }}" alt="ORA seal">
         <span class="brand-word">Oromo Research Association
                 <small>Journal &middot; Ebook &middot; Library &middot; Network &middot; Wiki &middot; Repository</small>
@@ -511,84 +615,195 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('register.post') }}">
+            <form method="POST" action="{{ route('register.post') }}" id="registerForm">
                 @csrf
 
-                <div class="row-2">
+                {{-- ============== STEP 1: details + module selection ============== --}}
+                <div id="step-1">
+
+                    <div class="step-indicator">
+                        <span class="dot active"></span><span>Your details</span>
+                        <span class="sep"></span>
+                        <span class="dot"></span><span>Confirm</span>
+                    </div>
+
+                    <div class="row-2">
+                        <div class="field">
+                            <label for="first_name">First name</label>
+                            <input id="first_name" type="text" name="first_name" class="form-control" value="{{ old('first_name') }}" required autofocus>
+                        </div>
+                        <div class="field">
+                            <label for="last_name">Last name</label>
+                            <input id="last_name" type="text" name="last_name" class="form-control" value="{{ old('last_name') }}" required>
+                        </div>
+                    </div>
+
                     <div class="field">
-                        <label for="first_name">First name</label>
-                        <input id="first_name" type="text" name="first_name" class="form-control" value="{{ old('first_name') }}" required autofocus>
+                        <label for="username">Username</label>
+                        <input id="username" type="text" name="username" class="form-control" value="{{ old('username') }}" required>
                     </div>
+
                     <div class="field">
-                        <label for="last_name">Last name</label>
-                        <input id="last_name" type="text" name="last_name" class="form-control" value="{{ old('last_name') }}" required>
+                        <label for="email">Email address</label>
+                        <input id="email" type="email" name="email" class="form-control" value="{{ old('email') }}" required>
                     </div>
-                </div>
 
-                <div class="field">
-                    <label for="username">Username</label>
-                    <input id="username" type="text" name="username" class="form-control" value="{{ old('username') }}" required>
-                </div>
-
-                <div class="field">
-                    <label for="email">Email address</label>
-                    <input id="email" type="email" name="email" class="form-control" value="{{ old('email') }}" required>
-                </div>
-
-                <div class="field">
-                    <label for="phone">Phone <span class="optional">&middot; optional</span></label>
-                    <input id="phone" type="text" name="phone" class="form-control" value="{{ old('phone') }}">
-                </div>
-
-                <div class="row-2">
                     <div class="field">
-                        <label for="password">Password</label>
-                        <input id="password" type="password" name="password" class="form-control" required minlength="8">
+                        <label for="phone">Phone <span class="optional">&middot; optional</span></label>
+                        <input id="phone" type="text" name="phone" class="form-control" value="{{ old('phone') }}">
                     </div>
-                    <div class="field">
-                        <label for="password_confirmation">Confirm password</label>
-                        <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" required minlength="8">
+
+                    <div class="row-2">
+                        <div class="field">
+                            <label for="password">Password</label>
+                            <input id="password" type="password" name="password" class="form-control" required minlength="8">
+                        </div>
+                        <div class="field">
+                            <label for="password_confirmation">Confirm password</label>
+                            <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" required minlength="8">
+                        </div>
                     </div>
+
+                    <div class="modules-field">
+                        <label>Which areas do you want to join?</label>
+                        @if($modules->isEmpty())
+                            <div class="alert" style="margin-top:8px;">
+                                No modules are currently open for self-registration.
+                                (If you're the site admin: check that the
+                                <code>is_self_registerable</code> migration has run and
+                                <code>ModuleSeeder</code> has been re-seeded.)
+                            </div>
+                        @else
+                            <div class="modules-grid">
+                                @foreach($modules as $module)
+                                    <label class="module-option">
+                                        <input
+                                            type="checkbox"
+                                            name="modules[]"
+                                            value="{{ $module->code }}"
+                                            data-module-name="{{ $module->name }}"
+                                            @checked(collect(old('modules', []))->contains($module->code))
+                                        >
+                                        <span>{{ $module->name }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+
+                    <button type="button" id="continueBtn" class="btn-join">Continue</button>
+
+                    <div class="divider">already have credentials?</div>
+
+                    <p class="signin-line">
+                        <a href="{{ route('login') }}">Sign in to your account</a>
+                    </p>
                 </div>
 
-                <div class="modules-field">
-                    <label>Which areas do you want to join?</label>
-                    <div class="modules-grid">
-                        @foreach($modules as $module)
-                            <label class="module-option">
-                                <input
-                                    type="checkbox"
-                                    name="modules[]"
-                                    value="{{ $module->code }}"
-                                    @checked(collect(old('modules', []))->contains($module->code))
-                                >
-                                <span>{{ $module->name }}</span>
-                            </label>
-                        @endforeach
+                {{-- ============== STEP 2: confirm before creating the account ============== --}}
+                <div id="step-2" style="display:none;">
+
+                    <div class="step-indicator">
+                        <span class="dot"></span><span>Your details</span>
+                        <span class="sep"></span>
+                        <span class="dot active"></span><span>Confirm</span>
                     </div>
+
+                    <p class="lede" style="margin-bottom: 16px;">Check everything below &mdash; you can go back and change anything before creating your account.</p>
+
+                    <div class="review-card">
+                        <dl>
+                            <dt>Name</dt>
+                            <dd id="summaryName"></dd>
+                            <dt>Username</dt>
+                            <dd id="summaryUsername"></dd>
+                            <dt>Email</dt>
+                            <dd id="summaryEmail"></dd>
+                        </dl>
+                    </div>
+
+                    <div class="review-card">
+                        <div class="review-modules-label">You're joining:</div>
+                        <ul class="review-modules-list" id="modulesSummary"></ul>
+                    </div>
+
+                    <label class="terms">
+                        <input type="checkbox" required>
+                        <span>I agree to the Oromo Research Association&rsquo;s
+                                <a href="#">Terms of Service</a> and
+                                <a href="#">Privacy Policy</a>, and consent to receive
+                                network updates by email.</span>
+                    </label>
+
+                    <button type="submit" class="btn-join">Agree &amp; Join</button>
+                    <button type="button" id="backBtn" class="btn-back">Back &amp; edit</button>
                 </div>
 
-                <label class="terms">
-                    <input type="checkbox" required>
-                    <span>I agree to the Oromo Research Association&rsquo;s
-                            <a href="#">Terms of Service</a> and
-                            <a href="#">Privacy Policy</a>, and consent to receive
-                            network updates by email.</span>
-                </label>
-
-                <button type="submit" class="btn-join">Agree &amp; Join</button>
-
-                <div class="divider">already have credentials?</div>
-
-                <p class="signin-line">
-                    <a href="{{ route('login') }}">Sign in to your account</a>
-                </p>
             </form>
 
         </div>
     </div>
 
 </div>
+
+<script>
+    (function () {
+        const step1 = document.getElementById('step-1');
+        const step2 = document.getElementById('step-2');
+        const continueBtn = document.getElementById('continueBtn');
+        const backBtn = document.getElementById('backBtn');
+        const modulesSummary = document.getElementById('modulesSummary');
+
+        continueBtn.addEventListener('click', function () {
+
+            // Validate every required field inside step 1 (native HTML5 validation).
+            const requiredInputs = step1.querySelectorAll('input[required]');
+            for (const input of requiredInputs) {
+                if (!input.checkValidity()) {
+                    input.reportValidity();
+                    return;
+                }
+            }
+
+            const password = document.getElementById('password').value;
+            const passwordConfirmation = document.getElementById('password_confirmation').value;
+            if (password !== passwordConfirmation) {
+                document.getElementById('password_confirmation').setCustomValidity('Passwords do not match.');
+                document.getElementById('password_confirmation').reportValidity();
+                return;
+            }
+            document.getElementById('password_confirmation').setCustomValidity('');
+
+            const checkedModules = step1.querySelectorAll('input[name="modules[]"]:checked');
+            if (checkedModules.length === 0) {
+                alert('Pick at least one area to join before continuing.');
+                return;
+            }
+
+            // Build the confirmation summary from what was actually filled in.
+            document.getElementById('summaryName').textContent =
+                document.getElementById('first_name').value + ' ' + document.getElementById('last_name').value;
+            document.getElementById('summaryUsername').textContent = document.getElementById('username').value;
+            document.getElementById('summaryEmail').textContent = document.getElementById('email').value;
+
+            modulesSummary.innerHTML = '';
+            checkedModules.forEach(function (checkbox) {
+                const li = document.createElement('li');
+                li.innerHTML = '<i class="bi bi-check-circle-fill"></i> ' + checkbox.dataset.moduleName;
+                modulesSummary.appendChild(li);
+            });
+
+            step1.style.display = 'none';
+            step2.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        backBtn.addEventListener('click', function () {
+            step2.style.display = 'none';
+            step1.style.display = 'block';
+        });
+    })();
+</script>
 
 </body>
 </html>

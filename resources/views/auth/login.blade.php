@@ -373,7 +373,7 @@
 <body>
 
 <div class="topbar">
-    <a class="brand" href="{{ route('login') }}">
+    <a class="brand" href="{{ route('portal') }}">
         <img class="brand-mark" src="{{ asset('assets/img/ora-logo.png') }}" alt="ORA seal">
         <span class="brand-word">Oromo Research Association
                 <small>Research &amp; Publishing Platform</small>

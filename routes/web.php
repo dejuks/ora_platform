@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Journal\PaymentController as JournalPaymentController;
 use App\Http\Controllers\Journal\PublicController as JournalPublicController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\PortalController;
 use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
 use App\Http\Controllers\Ebook\BookController as EbookBookController;
 use App\Http\Controllers\Ebook\DashboardController as EbookDashboardController;
@@ -43,8 +44,48 @@ use App\Http\Controllers\Researcher\ProfileController as ResearcherProfileContro
 use App\Http\Controllers\Researcher\RegisterController as ResearcherRegisterController;
 use App\Http\Controllers\Researcher\UserController as ResearcherUserController;
 use App\Http\Controllers\Wiki\DashboardController as WikiDashboardController;
+use App\Http\Controllers\Wiki\PublicController as WikiPublicController;
 use App\Http\Controllers\Wiki\UserController as WikiUserController;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC PORTAL (open to everyone — no login required)
+|--------------------------------------------------------------------------
+|
+| The front door of the site: one page listing every active module
+| with a link into whichever public area or sign-up flow applies to
+| it. Sits outside 'guest'/'auth' on purpose — a logged-in member can
+| still come back here, same reasoning as the module portals below.
+|
+*/
+
+Route::get('/', [PortalController::class, 'index'])->name('portal');
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC WIKI PORTAL (open to everyone — no login required)
+|--------------------------------------------------------------------------
+|
+| A published wiki article is public record, same reasoning as the
+| Journal / Ebook / Repository public portals below. The controller
+| and views already existed but were never wired to a route — added
+| here to match that existing pattern.
+|
+*/
+
+Route::prefix('wiki/articles')
+    ->as('wiki.public.')
+    ->group(function () {
+
+        Route::get('/', [WikiPublicController::class, 'index'])->name('index');
+
+        Route::get('/random', [WikiPublicController::class, 'random'])->name('random');
+
+        Route::get('/{article}', [WikiPublicController::class, 'show'])->name('show');
+    });
+
+Route::get('wiki/about', [WikiPublicController::class, 'about'])->name('wiki.public.about');
 
 /*
 |--------------------------------------------------------------------------
@@ -154,21 +195,31 @@ Route::post('ebook/payments/chapa/webhook', [EbookPaymentController::class, 'web
 
 Route::middleware('guest')->group(function () {
 
-    // Login page (use ONE route only)
-    Route::get('/', [AuthController::class, 'showLogin'])->name('login');
-
-    Route::get('/login', [AuthController::class, 'showLogin']);
+    // Login page (use ONE route only). '/' is now the public portal
+    // (see above) and open to everyone, so this named route — the
+    // one auth middleware redirects guests to — lives at /login.
+    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 
     Route::post('/login', [AuthController::class, 'login'])
         ->name('login.post');
 
     // Public self-registration — any visitor can create their own
     // Author account and start submitting manuscripts right away.
-    Route::get('/register', [RegisterController::class, 'showRegister'])
+   Route::get('/register', [RegisterController::class, 'showRegister'])
         ->name('register');
 
     Route::post('/register', [RegisterController::class, 'register'])
         ->name('register.post');
+
+    // Public self-registration — any visitor can create their own
+    // account and be enrolled straight into the Researchers'
+    // Network as a Member, separate from the Journal-branded
+    // /register page above.
+    Route::get('/researcher/register', [ResearcherRegisterController::class, 'showRegister'])
+        ->name('researcher.register');
+
+    Route::post('/researcher/register', [ResearcherRegisterController::class, 'register'])
+        ->name('researcher.register.post');
 
     // Public self-registration — any visitor can create their own
     // account and be enrolled straight into the Researchers'
