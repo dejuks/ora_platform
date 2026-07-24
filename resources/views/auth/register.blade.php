@@ -222,7 +222,7 @@
 
         .form-wrap{
             width: 100%;
-            max-width: 400px;
+            max-width: 420px;
         }
 
         .form-wrap h2{
@@ -244,6 +244,8 @@
             border: 1px solid #f3c9c9;
             background: #fdf1f1;
             color: #9b2c2c;
+            padding: 12px 14px;
+            margin-bottom: 18px;
         }
 
         .field{
@@ -284,6 +286,52 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 14px;
+        }
+
+        /* ---------------- Module checkboxes ---------------- */
+
+        .modules-field{
+            margin-bottom: 20px;
+        }
+
+        .modules-grid{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        @media (max-width: 480px){
+            .modules-grid{ grid-template-columns: 1fr; }
+        }
+
+        .module-option{
+            display: flex;
+            align-items: flex-start;
+            gap: 9px;
+            border: 1.4px solid var(--line);
+            border-radius: 10px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: 0.15s ease;
+            background: #fff;
+        }
+
+        .module-option:hover{
+            border-color: var(--gold-soft);
+        }
+
+        .module-option input{
+            margin-top: 3px;
+            accent-color: var(--green);
+            flex: none;
+        }
+
+        .module-option span{
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--ink);
+            line-height: 1.35;
         }
 
         .terms{
@@ -359,10 +407,10 @@
 <body>
 
 <div class="topbar">
-    <a class="brand" href="{{ route('researcher.register') }}">
+    <a class="brand" href="{{ route('register') }}">
         <img class="brand-mark" src="{{ asset('assets/img/ora-logo.png') }}" alt="ORA seal">
         <span class="brand-word">Oromo Research Association
-                <small>Researchers&rsquo; Network</small>
+                <small>Journal &middot; Ebook &middot; Library &middot; Network &middot; Wiki &middot; Repository</small>
             </span>
     </a>
     <div class="topbar-cta">
@@ -421,11 +469,12 @@
         <img class="hero-watermark" src="{{ asset('assets/img/ora-logo.png') }}" alt="">
 
         <div class="hero-content">
-            <div class="hero-eyebrow">Researchers&rsquo; Network</div>
+            <div class="hero-eyebrow">One account, every module</div>
             <h1>Where Oromo scholarship <em>finds</em> its community.</h1>
             <p>
-                Build a public profile, connect with peers across institutions, join
-                working groups, and stay ahead of calls for papers &mdash; one account
+                Publish in the Journal, deposit in the Repository, borrow from the
+                Library, contribute to the Wikipedia, or simply build your researcher
+                profile and network &mdash; pick what you need below, one account
                 for the whole Oromo Research Association platform.
             </p>
             <div class="hero-stats">
@@ -438,8 +487,8 @@
                     <span>to join, always</span>
                 </div>
                 <div>
-                    <strong>1</strong>
-                    <span>account, every module</span>
+                    <strong>{{ $modules->count() }}</strong>
+                    <span>modules to choose from</span>
                 </div>
             </div>
         </div>
@@ -450,7 +499,7 @@
         <div class="form-wrap">
 
             <h2>Create your account</h2>
-            <p class="lede">It only takes a minute &mdash; you can complete your profile afterward.</p>
+            <p class="lede">It only takes a minute &mdash; you can join more modules later from your dashboard.</p>
 
             @if($errors->any())
                 <div class="alert">
@@ -462,7 +511,7 @@
                 </div>
             @endif
 
-            <form method="POST" action="{{ route('researcher.register.post') }}">
+            <form method="POST" action="{{ route('register.post') }}">
                 @csrf
 
                 <div class="row-2">
@@ -499,6 +548,23 @@
                     <div class="field">
                         <label for="password_confirmation">Confirm password</label>
                         <input id="password_confirmation" type="password" name="password_confirmation" class="form-control" required minlength="8">
+                    </div>
+                </div>
+
+                <div class="modules-field">
+                    <label>Which areas do you want to join?</label>
+                    <div class="modules-grid">
+                        @foreach($modules as $module)
+                            <label class="module-option">
+                                <input
+                                    type="checkbox"
+                                    name="modules[]"
+                                    value="{{ $module->code }}"
+                                    @checked(collect(old('modules', []))->contains($module->code))
+                                >
+                                <span>{{ $module->name }}</span>
+                            </label>
+                        @endforeach
                     </div>
                 </div>
 

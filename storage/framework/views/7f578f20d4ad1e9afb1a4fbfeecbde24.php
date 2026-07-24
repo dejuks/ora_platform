@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 
@@ -34,6 +35,8 @@
 href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
   <!-- Template Main CSS File -->
   <link href="<?php echo e(asset('assets/css/main.css')); ?>" rel="stylesheet">
+
+  <?php echo $__env->yieldPushContent('styles'); ?>
 
   <!-- =======================================================
     * Template Name: AppDashboard - Bootstrap Admin Dashboard Template
@@ -404,8 +407,11 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
   <script src="<?php echo e(asset('assets/js/apps-sidebar-toggle.js')); ?>"></script>
 
   <script>
-    // Revenue Overview Chart
+    // Revenue Overview Chart (only on pages that actually have it)
     document.addEventListener('DOMContentLoaded', function() {
+      if (!document.querySelector('#revenueChart')) {
+        return;
+      }
       const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-color').trim();
       const successColor = getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim();
       const warningColor = getComputedStyle(document.documentElement).getPropertyValue('--warning-color').trim();
@@ -538,6 +544,9 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
       });
     });
   </script>
+
+  <?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 
-</html><?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/components/layout.blade.php ENDPATH**/ ?>
+</html>
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/components/layout.blade.php ENDPATH**/ ?>

@@ -4,29 +4,41 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Module;
-use App\Models\Role;
 use App\Models\User;
-use App\Models\UserModuleRole;
+use App\Services\ModuleEnrollmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 
 /**
- * Public, self-service registration for Journal authors. Anyone can
- * create an account here — no invitation from a Super Admin needed —
- * and is enrolled straight into the journal module with the "Author"
- * role, so they can submit a manuscript immediately after signing in.
+ * Public, self-service registration — one account for the whole ORA
+ * platform. The visitor picks which modules they want on the form
+ * (Journal, Ebook, Library, Researcher Network, Wiki, Repository),
+ * and is enrolled into each with that module's entry-level role,
+ * active immediately — no invitation or approval needed.
+ *
+ * This replaces the old split between the shared /register (which
+ * only ever enrolled Journal + Researcher, hardcoded) and the
+ * separate Researcher\RegisterController. Both signup paths now
+ * flow through here.
  */
 class RegisterController extends Controller
 {
+    public function __construct(protected ModuleEnrollmentService $enrollment)
+    {
+    }
+
     public function showRegister()
     {
-        return view('auth.register');
+        $modules = Module::selfRegisterable()->orderBy('name')->get();
+
+        return view('auth.register', compact('modules'));
     }
 
     public function register(Request $request)
     {
+        $selfRegisterableCodes = Module::selfRegisterable()->pluck('code')->all();
+
         $data = $request->validate([
             'first_name' => ['required', 'string', 'max:100'],
             'last_name' => ['required', 'string', 'max:100'],
@@ -34,6 +46,10 @@ class RegisterController extends Controller
             'email' => ['required', 'email', 'max:150', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:30', 'unique:users,phone'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'modules' => ['required', 'array', 'min:1'],
+            'modules.*' => ['string', 'in:' . implode(',', $selfRegisterableCodes)],
+        ], [
+            'modules.required' => 'Pick at least one area to join.',
         ]);
 
         $user = User::create([
@@ -46,73 +62,15 @@ class RegisterController extends Controller
             'status' => 'Active',
         ]);
 
-        $this->enrollAsJournalAuthor($user);
-        $this->enrollAsResearcherMember($user);
+        $joined = $this->enrollment->enrollMany($user, $data['modules']);
 
         Auth::login($user);
         $request->session()->regenerate();
 
+        $names = collect($joined)->pluck('name')->implode(', ');
+
         return redirect()
             ->route('dashboard')
-            ->with('success', 'Welcome! Your account is ready — you can submit a manuscript and start networking with other researchers now.');
-    }
-
-    /**
-     * Grant every new self-registered user the "Researcher / Member"
-     * role inside the Researcher Network module, and create an empty
-     * profile for them to fill in — anyone can register and start
-     * networking immediately, no invitation needed.
-     */
-    protected function enrollAsResearcherMember(User $user): void
-    {
-        $module = Module::where('code', 'researcher')->first();
-
-        if (! $module) {
-            return;
-        }
-
-        $memberRole = Role::where('module_id', $module->id)
-            ->where('slug', 'network-member')
-            ->first();
-
-        if ($memberRole) {
-            UserModuleRole::create([
-                'user_id' => $user->id,
-                'module_id' => $module->id,
-                'role_id' => $memberRole->id,
-                'is_active' => true,
-            ]);
-        }
-
-        $user->researcherProfile()->create([]);
-    }
-
-    /**
-     * Grant every new self-registered user the "Author" role inside
-     * the Journal module, so /journal/manuscripts opens up to them
-     * without a Super Admin having to assign anything manually.
-     */
-    protected function enrollAsJournalAuthor(User $user): void
-    {
-        $module = Module::where('code', 'journal')->first();
-
-        if (! $module) {
-            return;
-        }
-
-        $authorRole = Role::where('module_id', $module->id)
-            ->where('slug', 'author')
-            ->first();
-
-        if (! $authorRole) {
-            return;
-        }
-
-        UserModuleRole::create([
-            'user_id' => $user->id,
-            'module_id' => $module->id,
-            'role_id' => $authorRole->id,
-            'is_active' => true,
-        ]);
+            ->with('success', "Welcome! Your account is ready — you're enrolled in: {$names}.");
     }
 }
