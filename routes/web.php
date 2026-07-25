@@ -8,7 +8,9 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Journal\PaymentController as JournalPaymentController;
 use App\Http\Controllers\Journal\PublicController as JournalPublicController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\JoinController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
 use App\Http\Controllers\Ebook\BookController as EbookBookController;
@@ -61,6 +63,11 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/', [PortalController::class, 'index'])->name('portal');
+
+// Both forms live as sections on the portal page itself (#join,
+// #contact) — these are just the submit targets, no GET views.
+Route::post('/join', [JoinController::class, 'store'])->name('join.store');
+Route::post('/contact', [ContactController::class, 'store'])->name('contact.store');
 
 /*
 |--------------------------------------------------------------------------

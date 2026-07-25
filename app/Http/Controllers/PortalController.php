@@ -29,7 +29,86 @@ class PortalController extends Controller
 
         $cards = $modules->map(fn (Module $module) => $this->buildCard($module))->all();
 
-        return view('portal.index', compact('cards'));
+        return view('portal.index', [
+            'cards' => $cards,
+            'heroSlides' => $this->heroSlides(),
+            'team' => $this->team(),
+            'testimonials' => $this->testimonials(),
+            'roadmap' => $this->roadmap(),
+            'joinModules' => $modules->map(fn (Module $m) => ['id' => $m->id, 'name' => $m->name])->values()->all(),
+        ]);
+    }
+
+    /**
+     * Hero slideshow content. Each slide expects an image at
+     * public/assets/img/hero/{image}. Ship your own photos under
+     * those filenames (or edit the paths below) — the overlay
+     * gradient in the view keeps text readable over any image.
+     */
+    private function heroSlides(): array
+    {
+        return [
+            [
+                'image' => 'hero/hero-1.jpg',
+                'eyebrow' => 'Oromo Research Association',
+                'title' => 'Preserving knowledge, building the future.',
+                'subtitle' => 'One platform for Oromo scholarship, publishing, and community.',
+            ],
+            [
+                'image' => 'hero/hero-2.jpg',
+                'eyebrow' => 'Publish & discover',
+                'title' => 'Research that reaches its community.',
+                'subtitle' => 'Peer-reviewed journals, open books, and an archive anyone can cite.',
+            ],
+            [
+                'image' => 'hero/hero-3.jpg',
+                'eyebrow' => 'Connect & contribute',
+                'title' => 'A network built by and for Oromo researchers.',
+                'subtitle' => 'Find collaborators, join a group, and write for Oromo Wikipedia.',
+            ],
+        ];
+    }
+
+    /**
+     * Placeholder team roster — replace with real names, roles, and
+     * photos (or wire this up to a database table later if the team
+     * changes often enough to need an admin screen).
+     */
+    private function team(): array
+    {
+        return [
+            ['name' => 'Executive Director', 'role' => 'Strategy & Partnerships', 'photo' => null],
+            ['name' => 'Research Lead', 'role' => 'Journal & Peer Review', 'photo' => null],
+            ['name' => 'Community Lead', 'role' => 'Researcher Network & Wiki', 'photo' => null],
+            ['name' => 'Platform Lead', 'role' => 'Library & Repository', 'photo' => null],
+        ];
+    }
+
+    /**
+     * Placeholder testimonials — swap in real quotes (with consent)
+     * as they come in.
+     */
+    private function testimonials(): array
+    {
+        return [
+            ['quote' => 'Publishing through the Journal module made the review process transparent from submission to decision.', 'name' => 'Journal Author'],
+            ['quote' => 'The Researcher Network helped me find collaborators working on the same questions I was.', 'name' => 'Network Member'],
+            ['quote' => 'Having the eBook library and Repository in one place makes citing sources far easier.', 'name' => 'Repository User'],
+        ];
+    }
+
+    /**
+     * Placeholder roadmap — update the labels/status as milestones
+     * actually land.
+     */
+    private function roadmap(): array
+    {
+        return [
+            ['label' => 'Platform launch', 'detail' => 'Journal, Ebook, Library, Researcher Network, Wiki, and Repository modules live.', 'status' => 'done'],
+            ['label' => 'Public portal', 'detail' => 'One landing page for every module, plus Join and Contact forms.', 'status' => 'done'],
+            ['label' => 'Mobile app', 'detail' => 'A companion app for reading and notifications on the go.', 'status' => 'planned'],
+            ['label' => 'Multilingual interface', 'detail' => 'Afaan Oromoo alongside English across every module.', 'status' => 'planned'],
+        ];
     }
 
     /**

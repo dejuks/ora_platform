@@ -511,7 +511,7 @@
 <body>
 
 <div class="topbar">
-    <a class="brand" href="<?php echo e(route('register')); ?>">
+    <a class="brand" href="<?php echo e(route('portal')); ?>">
         <img class="brand-mark" src="<?php echo e(asset('assets/img/ora-logo.png')); ?>" alt="ORA seal">
         <span class="brand-word">Oromo Research Association
                 <small>Journal &middot; Ebook &middot; Library &middot; Network &middot; Wiki &middot; Repository</small>
