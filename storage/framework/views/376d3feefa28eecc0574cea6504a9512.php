@@ -3,9 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Oromo Wikipedia — The Free Encyclopedia')</title>
-    <link href="{{ asset('vendors/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
-    <link href="{{ asset('vendors/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
+    <title><?php echo $__env->yieldContent('title', 'Oromo Wikipedia — The Free Encyclopedia'); ?></title>
+    <link href="<?php echo e(asset('vendors/bootstrap/css/bootstrap.min.css')); ?>" rel="stylesheet">
+    <link href="<?php echo e(asset('vendors/bootstrap-icons/bootstrap-icons.css')); ?>" rel="stylesheet">
 
     <style>
         :root{
@@ -323,25 +323,25 @@
             .ow-main{ padding:16px; }
         }
 
-        @stack('styles')
+        <?php echo $__env->yieldPushContent('styles'); ?>
     </style>
 </head>
 <body>
 
-{{-- Top identity bar --}}
+
 <div class="ow-topbar">
     <div class="container d-flex justify-content-end ow-topbar-links">
-        <a href="{{ route('login') }}">Log in</a>
-        @if (Route::has('register'))
-            <a href="{{ route('register') }}">Create account</a>
-        @endif
+        <a href="<?php echo e(route('login')); ?>">Log in</a>
+        <?php if(Route::has('register')): ?>
+            <a href="<?php echo e(route('register')); ?>">Create account</a>
+        <?php endif; ?>
     </div>
 </div>
 
-{{-- Masthead --}}
+
 <div class="ow-masthead">
     <div class="container d-flex align-items-center flex-wrap gap-3">
-        <a href="{{ route('wiki.public.index') }}" class="ow-logo text-decoration-none">
+        <a href="<?php echo e(route('wiki.public.index')); ?>" class="ow-logo text-decoration-none">
             <span class="ow-globe"><i class="bi bi-globe-americas"></i></span>
             <span class="ow-logo-text">
           <span class="ow-wordmark ow-serif d-block text-dark">Oromo Wikipedia</span>
@@ -349,40 +349,40 @@
         </span>
         </a>
 
-        <form method="GET" action="{{ route('wiki.public.index') }}" class="ow-search-form d-flex flex-grow-1">
-            <input type="text" name="q" class="form-control" placeholder="Search Oromo Wikipedia" value="{{ request('q') }}" aria-label="Search articles">
+        <form method="GET" action="<?php echo e(route('wiki.public.index')); ?>" class="ow-search-form d-flex flex-grow-1">
+            <input type="text" name="q" class="form-control" placeholder="Search Oromo Wikipedia" value="<?php echo e(request('q')); ?>" aria-label="Search articles">
             <button type="submit" class="btn"><i class="bi bi-search"></i></button>
         </form>
     </div>
 </div>
 
-{{-- Section tabs --}}
+
 <div class="ow-tabs">
     <div class="container">
         <ul class="nav">
-            <li class="nav-item"><a class="nav-link @yield('tab-articles', '')" href="{{ route('wiki.public.index') }}">Articles</a></li>
+            <li class="nav-item"><a class="nav-link <?php echo $__env->yieldContent('tab-articles', ''); ?>" href="<?php echo e(route('wiki.public.index')); ?>">Articles</a></li>
             <li class="nav-item"><a class="nav-link" href="#">Categories</a></li>
-            <li class="nav-item"><a class="nav-link @yield('tab-about', '')" href="{{ route('wiki.public.about') }}">About</a></li>
+            <li class="nav-item"><a class="nav-link <?php echo $__env->yieldContent('tab-about', ''); ?>" href="<?php echo e(route('wiki.public.about')); ?>">About</a></li>
         </ul>
     </div>
 </div>
 
-{{-- Body shell: sidebar + main --}}
+
 <div class="container px-0">
     <div class="ow-shell">
 
         <aside class="ow-sidebar">
             <h6>Navigation</h6>
             <ul>
-                <li><a href="{{ route('wiki.public.index') }}">Main page</a></li>
-                <li><a href="{{ route('wiki.public.random') }}">Random article</a></li>
-                <li><a href="{{ route('wiki.public.about') }}">About Oromo Wikipedia</a></li>
+                <li><a href="<?php echo e(route('wiki.public.index')); ?>">Main page</a></li>
+                <li><a href="<?php echo e(route('wiki.public.random')); ?>">Random article</a></li>
+                <li><a href="<?php echo e(route('wiki.public.about')); ?>">About Oromo Wikipedia</a></li>
                 <li><a href="#">Contact us</a></li>
             </ul>
 
             <h6>Contribute</h6>
             <ul>
-                <li><a href="{{ route('login') }}">Sign in to edit</a></li>
+                <li><a href="<?php echo e(route('login')); ?>">Sign in to edit</a></li>
                 <li><a href="#">Help</a></li>
                 <li><a href="#">Community portal</a></li>
             </ul>
@@ -396,24 +396,25 @@
         </aside>
 
         <main class="ow-main">
-            @yield('content')
+            <?php echo $__env->yieldContent('content'); ?>
         </main>
     </div>
 </div>
 
-{{-- Footer --}}
+
 <div class="ow-footer">
     <div class="container">
         <div>Content is available for public reading. Text may be subject to review before publication.</div>
         <div class="ow-footer-links">
-            <a href="{{ route('wiki.public.about') }}">About</a>
+            <a href="<?php echo e(route('wiki.public.about')); ?>">About</a>
             <a href="#">Contact us</a>
             <a href="#">Terms of use</a>
-            <a href="{{ route('login') }}">Sign in</a>
+            <a href="<?php echo e(route('login')); ?>">Sign in</a>
         </div>
     </div>
 </div>
 
-@stack('scripts')
+<?php echo $__env->yieldPushContent('scripts'); ?>
 </body>
 </html>
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/components/wiki.blade.php ENDPATH**/ ?>
