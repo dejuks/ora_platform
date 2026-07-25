@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Article;
 use App\Models\ArticleDeletionDiscussion;
 use App\Models\Wiki\ContactMessage;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Dashboard for the Oromo Wikipedia module.
@@ -14,8 +15,20 @@ class DashboardController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+
+        $stats = [
+            'published_articles' => Article::published()->count(),
+            'my_articles' => Article::where('author_id', $user->id)->count(),
+            'open_deletion_discussions' => ArticleDeletionDiscussion::where('status', 'open')->count(),
+        ];
+
         return view('modules.wiki.dashboard', [
             'moduleLabel' => 'Oromo Wikipedia',
+            'stats' => $stats,
+            'canEdit' => $user->hasModulePermission('wiki', 'edit-articles'),
+            'canModerate' => $user->hasModulePermission('wiki', 'moderate-content'),
+            'canSuppress' => $user->hasModulePermission('wiki', 'suppress-revisions'),
         ]);
     }
 

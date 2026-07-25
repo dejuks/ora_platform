@@ -1,0 +1,227 @@
+diff --git a/app/Http/Controllers/Wiki/DashboardController.php b/app/Http/Controllers/Wiki/DashboardController.php
+index fc73e34..0f83b36 100644
+--- a/app/Http/Controllers/Wiki/DashboardController.php
++++ b/app/Http/Controllers/Wiki/DashboardController.php
+@@ -6,6 +6,7 @@
+ use App\Models\Article;
+ use App\Models\ArticleDeletionDiscussion;
+ use App\Models\Wiki\ContactMessage;
++use Illuminate\Support\Facades\Auth;
+ 
+ /**
+  * Dashboard for the Oromo Wikipedia module.
+@@ -14,8 +15,20 @@ class DashboardController extends Controller
+ {
+     public function index()
+     {
++        $user = Auth::user();
++
++        $stats = [
++            'published_articles' => Article::published()->count(),
++            'my_articles' => Article::where('author_id', $user->id)->count(),
++            'open_deletion_discussions' => ArticleDeletionDiscussion::where('status', 'open')->count(),
++        ];
++
+         return view('modules.wiki.dashboard', [
+             'moduleLabel' => 'Oromo Wikipedia',
++            'stats' => $stats,
++            'canEdit' => $user->hasModulePermission('wiki', 'edit-articles'),
++            'canModerate' => $user->hasModulePermission('wiki', 'moderate-content'),
++            'canSuppress' => $user->hasModulePermission('wiki', 'suppress-revisions'),
+         ]);
+     }
+ 
+diff --git a/resources/views/modules/wiki/dashboard.blade.php b/resources/views/modules/wiki/dashboard.blade.php
+index dfe1f95..cf5b6ae 100644
+--- a/resources/views/modules/wiki/dashboard.blade.php
++++ b/resources/views/modules/wiki/dashboard.blade.php
+@@ -1,11 +1,78 @@
+ <x-layout>
+ 
+-  <div class="main-content d-flex align-items-center justify-content-center" style="min-height:60vh;">
+-    <div class="text-center">
+-      <i class="bi bi-cone-striped display-1 text-muted"></i>
+-      <h1 class="h3 mt-3">{{ $moduleLabel }}</h1>
+-      <p class="text-muted">You have access to this module. Its features are the next thing to build.</p>
++  <div class="main-content page-wiki-dashboard">
++
++    <div class="d-flex justify-content-between align-items-center mb-4">
++      <div>
++        <h1 class="h3 mb-1">{{ $moduleLabel }}</h1>
++        <p class="text-muted mb-0">Browse, write, and help govern the Oromo Wikipedia.</p>
++      </div>
++      @if($canEdit)
++        <a href="{{ route('wiki.articles.create') }}" class="btn btn-primary">
++          <i class="bi bi-file-earmark-plus"></i> New Article
++        </a>
++      @endif
++    </div>
++
++    <div class="row g-4 mb-4">
++
++      <div class="col-md-4">
++        <div class="card">
++          <div class="card-body">
++            <div class="text-muted small">Published Articles</div>
++            <div class="h3 mb-0">{{ $stats['published_articles'] }}</div>
++          </div>
++        </div>
++      </div>
++
++      <div class="col-md-4">
++        <div class="card">
++          <div class="card-body">
++            <div class="text-muted small">Articles I've Written</div>
++            <div class="h3 mb-0">{{ $stats['my_articles'] }}</div>
++          </div>
++        </div>
++      </div>
++
++      <div class="col-md-4">
++        <div class="card">
++          <div class="card-body">
++            <div class="text-muted small">Open Deletion Discussions</div>
++            <div class="h3 mb-0">{{ $stats['open_deletion_discussions'] }}</div>
++          </div>
++        </div>
++      </div>
++
++    </div>
++
++    <div class="d-flex flex-wrap gap-2">
++
++      <a href="{{ route('wiki.articles.index') }}" class="btn btn-outline-primary">
++        <i class="bi bi-list"></i> Manage Articles
++      </a>
++
++      <a href="{{ route('wiki.public.index') }}" class="btn btn-outline-secondary">
++        <i class="bi bi-globe"></i> Browse Public Wiki
++      </a>
++
++      <a href="{{ route('wiki.deletions.index') }}" class="btn btn-outline-secondary">
++        <i class="bi bi-exclamation-triangle"></i> Deletion Discussions
++      </a>
++
++      @if($canModerate)
++        <a href="{{ route('wiki.blocks.index') }}" class="btn btn-outline-dark">
++          <i class="bi bi-slash-circle"></i> User Blocks
++        </a>
++      @endif
++
++      @if($canSuppress)
++        <a href="{{ route('wiki.revisions.index') }}" class="btn btn-outline-dark">
++          <i class="bi bi-eye-slash"></i> Revision Oversight
++        </a>
++      @endif
++
+     </div>
++
+   </div>
+ 
+ </x-layout>
+diff --git a/routes/web.php b/routes/web.php
+index 2c90bb4..bb406dc 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -49,8 +49,12 @@
+ use App\Http\Controllers\Researcher\ProfileController as ResearcherProfileController;
+ use App\Http\Controllers\Researcher\RegisterController as ResearcherRegisterController;
+ use App\Http\Controllers\Researcher\UserController as ResearcherUserController;
++use App\Http\Controllers\Wiki\ArticleController as WikiArticleController;
++use App\Http\Controllers\Wiki\BlockController as WikiBlockController;
+ use App\Http\Controllers\Wiki\DashboardController as WikiDashboardController;
++use App\Http\Controllers\Wiki\DeletionDiscussionController as WikiDeletionDiscussionController;
+ use App\Http\Controllers\Wiki\PublicController as WikiPublicController;
++use App\Http\Controllers\Wiki\RevisionController as WikiRevisionController;
+ use App\Http\Controllers\Wiki\UserController as WikiUserController;
+ use Illuminate\Support\Facades\Route;
+ 
+@@ -463,6 +467,88 @@
+                 ->name('settings.update');
+         });
+ 
++    /*
++    |--------------------------------------------------------------------------
++    | OROMO WIKIPEDIA — the editing workflow
++    |--------------------------------------------------------------------------
++    |
++    | Registered Editor creates/edits an article (edit-articles) -> any
++    | member can nominate it for deletion / weigh in on that discussion
++    | -> Administrator (Sysop) protects/deletes/restores pages and
++    | blocks disruptive users (moderate-content) -> Oversighter
++    | suppresses revisions containing private data (suppress-revisions).
++    | Controllers and views already existed but were never wired to a
++    | route — added here to match the Journal/Ebook/Library pattern.
++    |
++    */
++
++    Route::prefix('wiki')
++        ->as('wiki.')
++        ->middleware('module.access:wiki')
++        ->group(function () {
++
++            // NOTE: path is 'wiki/manage/articles', not 'wiki/articles' —
++            // the latter is already taken by the public wiki portal
++            // above (registered outside auth) and would otherwise
++            // shadow every route in this group. Route *names* still
++            // read as wiki.articles.* to match the views/controllers.
++            Route::prefix('manage/articles')
++                ->as('articles.')
++                ->group(function () {
++
++                    Route::get('/', [WikiArticleController::class, 'index'])->name('index');
++                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
++                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
++                    Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
++                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
++                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
++
++                    // Administrator (Sysop) — the protect/restore forms
++                    // submit plain POST (no @method spoofing), hence POST here.
++                    Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
++                    Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
++                    Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
++                        ->withTrashed()->name('restore');
++
++                    // Nominate this article for deletion (Articles for Deletion)
++                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
++                        ->name('deletions.store');
++                });
++
++            Route::prefix('deletions')
++                ->as('deletions.')
++                ->group(function () {
++
++                    Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
++                    Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
++                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
++
++                    // Administrator (Sysop)
++                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
++                });
++
++            // Administrator (Sysop): block disruptive users/IPs
++            Route::prefix('blocks')
++                ->as('blocks.')
++                ->group(function () {
++
++                    Route::get('/', [WikiBlockController::class, 'index'])->name('index');
++                    Route::get('create', [WikiBlockController::class, 'create'])->name('create');
++                    Route::post('/', [WikiBlockController::class, 'store'])->name('store');
++                    Route::post('{block}/lift', [WikiBlockController::class, 'lift'])->name('lift');
++                });
++
++            // Oversighter/CheckUser: suppress revisions containing private data
++            Route::prefix('revisions')
++                ->as('revisions.')
++                ->group(function () {
++
++                    Route::get('/', [WikiRevisionController::class, 'index'])->name('index');
++                    Route::post('{revision}/suppress', [WikiRevisionController::class, 'suppress'])->name('suppress');
++                    Route::post('{revision}/unsuppress', [WikiRevisionController::class, 'unsuppress'])->name('unsuppress');
++                });
++        });
++
+     // Any logged-in ORA user can self-enroll as an eBook Author —
+     // deliberately OUTSIDE module.access:ebook below, since a user
+     // must be able to request ebook access before they have it.

@@ -49,8 +49,12 @@ use App\Http\Controllers\Researcher\MessageController as ResearcherMessageContro
 use App\Http\Controllers\Researcher\ProfileController as ResearcherProfileController;
 use App\Http\Controllers\Researcher\RegisterController as ResearcherRegisterController;
 use App\Http\Controllers\Researcher\UserController as ResearcherUserController;
+use App\Http\Controllers\Wiki\ArticleController as WikiArticleController;
+use App\Http\Controllers\Wiki\BlockController as WikiBlockController;
 use App\Http\Controllers\Wiki\DashboardController as WikiDashboardController;
+use App\Http\Controllers\Wiki\DeletionDiscussionController as WikiDeletionDiscussionController;
 use App\Http\Controllers\Wiki\PublicController as WikiPublicController;
+use App\Http\Controllers\Wiki\RevisionController as WikiRevisionController;
 use App\Http\Controllers\Wiki\UserController as WikiUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -461,6 +465,88 @@ Route::middleware('auth')->group(function () {
 
             Route::put('settings', [JournalSettingsController::class, 'update'])
                 ->name('settings.update');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | OROMO WIKIPEDIA — the editing workflow
+    |--------------------------------------------------------------------------
+    |
+    | Registered Editor creates/edits an article (edit-articles) -> any
+    | member can nominate it for deletion / weigh in on that discussion
+    | -> Administrator (Sysop) protects/deletes/restores pages and
+    | blocks disruptive users (moderate-content) -> Oversighter
+    | suppresses revisions containing private data (suppress-revisions).
+    | Controllers and views already existed but were never wired to a
+    | route — added here to match the Journal/Ebook/Library pattern.
+    |
+    */
+
+    Route::prefix('wiki')
+        ->as('wiki.')
+        ->middleware('module.access:wiki')
+        ->group(function () {
+
+            // NOTE: path is 'wiki/manage/articles', not 'wiki/articles' —
+            // the latter is already taken by the public wiki portal
+            // above (registered outside auth) and would otherwise
+            // shadow every route in this group. Route *names* still
+            // read as wiki.articles.* to match the views/controllers.
+            Route::prefix('manage/articles')
+                ->as('articles.')
+                ->group(function () {
+
+                    Route::get('/', [WikiArticleController::class, 'index'])->name('index');
+                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
+                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+                    Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
+                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
+                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
+
+                    // Administrator (Sysop) — the protect/restore forms
+                    // submit plain POST (no @method spoofing), hence POST here.
+                    Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
+                    Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
+                    Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
+                        ->withTrashed()->name('restore');
+
+                    // Nominate this article for deletion (Articles for Deletion)
+                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
+                        ->name('deletions.store');
+                });
+
+            Route::prefix('deletions')
+                ->as('deletions.')
+                ->group(function () {
+
+                    Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
+                    Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
+                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
+
+                    // Administrator (Sysop)
+                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
+                });
+
+            // Administrator (Sysop): block disruptive users/IPs
+            Route::prefix('blocks')
+                ->as('blocks.')
+                ->group(function () {
+
+                    Route::get('/', [WikiBlockController::class, 'index'])->name('index');
+                    Route::get('create', [WikiBlockController::class, 'create'])->name('create');
+                    Route::post('/', [WikiBlockController::class, 'store'])->name('store');
+                    Route::post('{block}/lift', [WikiBlockController::class, 'lift'])->name('lift');
+                });
+
+            // Oversighter/CheckUser: suppress revisions containing private data
+            Route::prefix('revisions')
+                ->as('revisions.')
+                ->group(function () {
+
+                    Route::get('/', [WikiRevisionController::class, 'index'])->name('index');
+                    Route::post('{revision}/suppress', [WikiRevisionController::class, 'suppress'])->name('suppress');
+                    Route::post('{revision}/unsuppress', [WikiRevisionController::class, 'unsuppress'])->name('unsuppress');
+                });
         });
 
     // Any logged-in ORA user can self-enroll as an eBook Author —
