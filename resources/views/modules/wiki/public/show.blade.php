@@ -59,7 +59,7 @@
                 <div class="ow-box-body">
                     <ul>
                         <li><a href="{{ route('login') }}">Sign in to suggest an edit</a></li>
-                        <li><a href="#">Read the contributor guidelines</a></li>
+                        <li><a href="{{ route('wiki.public.about') }}#contributor-guidelines">Read the contributor guidelines</a></li>
                     </ul>
                 </div>
             </div>

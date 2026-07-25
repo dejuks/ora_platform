@@ -49,6 +49,21 @@
                     be searched from the search bar at the top of every page.
                 </p>
 
+                <h2 class="ow-serif" id="contributor-guidelines">Contributor Guidelines</h2>
+                <p>
+                    Anyone with an account can create or edit an article. A few ground rules keep the
+                    encyclopedia trustworthy:
+                </p>
+                <ul>
+                    <li>Write neutrally — describe topics fairly rather than arguing a point of view.</li>
+                    <li>Cite sources where a claim can reasonably be checked.</li>
+                    <li>Write original text; don't copy from other publications.</li>
+                    <li>Use the edit summary field to briefly explain what changed and why.</li>
+                    <li>Protected or disputed pages route through review before changes go live.</li>
+                    <li>If you think a page should be removed, open a deletion discussion rather than
+                        editing it out — the community weighs in before an Administrator closes it.</li>
+                </ul>
+
                 <h2 class="ow-serif">Editorial approach</h2>
                 <p>
                     Contributors are expected to write neutrally, cite sources where claims can be

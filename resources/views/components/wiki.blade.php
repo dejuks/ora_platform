@@ -361,7 +361,6 @@
     <div class="container">
         <ul class="nav">
             <li class="nav-item"><a class="nav-link @yield('tab-articles', '')" href="{{ route('wiki.public.index') }}">Articles</a></li>
-            <li class="nav-item"><a class="nav-link" href="#">Categories</a></li>
             <li class="nav-item"><a class="nav-link @yield('tab-about', '')" href="{{ route('wiki.public.about') }}">About</a></li>
         </ul>
     </div>
@@ -377,21 +376,13 @@
                 <li><a href="{{ route('wiki.public.index') }}">Main page</a></li>
                 <li><a href="{{ route('wiki.public.random') }}">Random article</a></li>
                 <li><a href="{{ route('wiki.public.about') }}">About Oromo Wikipedia</a></li>
-                <li><a href="#">Contact us</a></li>
+                <li><a href="{{ route('portal') }}#contact">Contact us</a></li>
             </ul>
 
             <h6>Contribute</h6>
             <ul>
                 <li><a href="{{ route('login') }}">Sign in to edit</a></li>
-                <li><a href="#">Help</a></li>
-                <li><a href="#">Community portal</a></li>
-            </ul>
-
-            <h6>Tools</h6>
-            <ul>
-                <li><a href="#">What links here</a></li>
-                <li><a href="#">Special pages</a></li>
-                <li><a href="#">Cite this page</a></li>
+                <li><a href="{{ route('wiki.public.about') }}#contributor-guidelines">Contributor guidelines</a></li>
             </ul>
         </aside>
 
@@ -407,8 +398,7 @@
         <div>Content is available for public reading. Text may be subject to review before publication.</div>
         <div class="ow-footer-links">
             <a href="{{ route('wiki.public.about') }}">About</a>
-            <a href="#">Contact us</a>
-            <a href="#">Terms of use</a>
+            <a href="{{ route('portal') }}#contact">Contact us</a>
             <a href="{{ route('login') }}">Sign in</a>
         </div>
     </div>

@@ -77,7 +77,7 @@
                 <div class="ow-box-body">
                     <ul>
                         <li><a href="<?php echo e(route('login')); ?>">Sign in to write or edit an article</a></li>
-                        <li><a href="#">Read the contributor guidelines</a></li>
+                        <li><a href="<?php echo e(route('wiki.public.about')); ?>#contributor-guidelines">Read the contributor guidelines</a></li>
                     </ul>
                 </div>
             </div>
