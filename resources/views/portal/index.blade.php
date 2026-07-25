@@ -29,12 +29,16 @@
 
         *{ box-sizing: border-box; }
 
+        html{ overflow-x: hidden; }
+
         body{
             margin: 0;
             font-family: 'Inter', sans-serif;
             background: var(--paper);
             color: var(--ink);
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            max-width: 100vw;
         }
 
         h1, h2, h3, .brand-word{ font-family: 'Newsreader', serif; }
@@ -65,16 +69,31 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 20px;
-            padding: 14px clamp(20px, 4vw, 56px);
+            gap: 12px;
+            padding: 14px clamp(16px, 4vw, 56px);
             border-bottom: 1px solid var(--line);
             background: rgba(251, 250, 247, 0.92);
             backdrop-filter: blur(6px);
         }
 
-        .brand{ display: flex; align-items: center; gap: 10px; color: var(--ink); flex: none; }
+        .brand{
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--ink);
+            flex: 1 1 auto;
+            min-width: 0;
+        }
         .brand-mark{ width: 38px; height: auto; flex: none; display: block; }
-        .brand-word{ font-size: 16px; font-weight: 600; letter-spacing: 0.2px; }
+        .brand-word{
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
         .brand-word small{
             display: block;
             font-family: 'Inter', sans-serif;
@@ -82,6 +101,13 @@
             font-size: 10.5px;
             color: var(--muted);
             letter-spacing: 0.4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 420px){
+            .brand-word small{ display: none; }
         }
 
         .topnav{
@@ -111,6 +137,72 @@
             white-space: nowrap;
         }
         .topbar-cta a:hover{ background: var(--navy); color: #fff; }
+
+        @media (max-width: 900px){ .topbar-cta{ display: none; } }
+
+        /* ---------------- Mobile nav toggle + menu ---------------- */
+
+        .nav-toggle{
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            flex: none;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: #fff;
+            color: var(--navy);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 900px){
+            .nav-toggle{ display: flex; }
+        }
+
+        .mobile-menu{
+            display: none;
+            flex-direction: column;
+            gap: 2px;
+            padding: 10px clamp(16px, 4vw, 56px) 18px;
+            background: var(--paper);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .mobile-menu.is-open{ display: flex; }
+
+        .mobile-menu a{
+            padding: 12px 4px;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--ink);
+            border-bottom: 1px solid var(--line);
+        }
+
+        .mobile-menu a:last-child{ border-bottom: none; }
+
+        .mobile-menu .mobile-menu-cta{
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .mobile-menu .mobile-menu-cta a{
+            flex: 1;
+            text-align: center;
+            border: 1px solid var(--navy);
+            border-radius: 999px;
+            font-weight: 600;
+            color: var(--navy);
+        }
+
+        .mobile-menu .mobile-menu-cta a.primary{
+            background: var(--navy);
+            color: #fff;
+        }
+
+        @media (min-width: 901px){ .mobile-menu{ display: none !important; } }
 
         /* ---------------- Hero slideshow ---------------- */
 
@@ -545,7 +637,30 @@
             <a href="{{ route('register') }}">Create account</a>
         @endauth
     </div>
+
+    <button type="button" class="nav-toggle" id="navToggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobileMenu">
+        <i class="bi bi-list"></i>
+    </button>
 </div>
+
+<nav class="mobile-menu" id="mobileMenu">
+    <a href="#modules">Modules</a>
+    <a href="#about">About</a>
+    <a href="#team">Team</a>
+    <a href="#testimonials">Testimonials</a>
+    <a href="#roadmap">Roadmap</a>
+    <a href="#join">Join</a>
+    <a href="#contact">Contact</a>
+
+    <div class="mobile-menu-cta">
+        @auth
+            <a class="primary" href="{{ route('dashboard') }}">Dashboard</a>
+        @else
+            <a href="{{ route('login') }}">Sign in</a>
+            <a class="primary" href="{{ route('register') }}">Create account</a>
+        @endauth
+    </div>
+</nav>
 
 {{-- ==================== Hero slideshow ==================== --}}
 <div class="hero" id="hero">
@@ -891,6 +1006,42 @@
         <span>Built for the Oromo community.</span>
     </div>
 </footer>
+
+<script>
+    (function () {
+        var toggle = document.getElementById('navToggle');
+        var menu = document.getElementById('mobileMenu');
+        if (! toggle || ! menu) return;
+
+        function closeMenu() {
+            menu.classList.remove('is-open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.innerHTML = '<i class="bi bi-list"></i>';
+        }
+
+        function openMenu() {
+            menu.classList.add('is-open');
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.innerHTML = '<i class="bi bi-x-lg"></i>';
+        }
+
+        toggle.addEventListener('click', function () {
+            if (menu.classList.contains('is-open')) {
+                closeMenu();
+            } else {
+                openMenu();
+            }
+        });
+
+        menu.querySelectorAll('a').forEach(function (link) {
+            link.addEventListener('click', closeMenu);
+        });
+
+        window.addEventListener('resize', function () {
+            if (window.innerWidth > 900) closeMenu();
+        });
+    })();
+</script>
 
 <script>
     (function () {
