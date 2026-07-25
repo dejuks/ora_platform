@@ -497,15 +497,25 @@ Route::middleware('auth')->group(function () {
                 ->group(function () {
 
                     Route::get('/', [WikiArticleController::class, 'index'])->name('index');
-                    Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
 
                     // A blocked user/IP can still browse the wiki (same as
                     // Wikipedia) but every action that creates, edits, or
                     // otherwise changes content is gated behind an active-
                     // block check.
+                    //
+                    // NOTE: literal segments ('create') must be registered
+                    // before the wildcard '{article}' routes below, or
+                    // Laravel matches '{article}' first and tries to
+                    // route-model-bind the literal string "create" as an
+                    // article ID.
                     Route::middleware('wiki.not_blocked')->group(function () {
                         Route::get('create', [WikiArticleController::class, 'create'])->name('create');
                         Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+                    });
+
+                    Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
+
+                    Route::middleware('wiki.not_blocked')->group(function () {
                         Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
                         Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 

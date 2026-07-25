@@ -1,0 +1,181 @@
+<?php if (isset($component)) { $__componentOriginal23a33f287873b564aaf305a1526eada4 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal23a33f287873b564aaf305a1526eada4 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.layout','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('layout'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes([]); ?>
+
+  <?php
+    $user = auth()->user();
+    $canEdit = $user->hasModulePermission('wiki', 'edit-articles');
+    $canModerate = $user->hasModulePermission('wiki', 'moderate-content');
+  ?>
+
+  <div class="main-content page-wiki-article-show">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <div>
+        <h1 class="h3 mb-1">
+          <?php echo e($article->title); ?>
+
+          <?php if($article->trashed()): ?>
+            <span class="badge bg-danger">Deleted</span>
+          <?php endif; ?>
+        </h1>
+        <p class="text-muted mb-0">
+          <span class="badge bg-secondary"><?php echo e($article->statusLabel()); ?></span>
+          <?php if($article->protection_level !== 'none'): ?>
+            <span class="badge bg-warning text-dark"><?php echo e($article->protectionLabel()); ?></span>
+          <?php endif; ?>
+          · By <?php echo e($article->author->full_name ?? '—'); ?>
+
+          · Last edited by <?php echo e($article->lastEditedBy->full_name ?? '—'); ?>
+
+        </p>
+      </div>
+      <a href="<?php echo e(route('wiki.articles.index')); ?>" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back
+      </a>
+    </div>
+
+    <?php if(session('success')): ?>
+      <div class="alert alert-success"><?php echo e(session('success')); ?></div>
+    <?php endif; ?>
+
+    <div class="row g-4">
+
+      <div class="col-lg-8">
+
+        <div class="card mb-4">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <strong>Content</strong>
+            <?php if($canEdit && ! $article->trashed()): ?>
+              <a href="<?php echo e(route('wiki.articles.edit', $article)); ?>" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            <?php endif; ?>
+          </div>
+          <div class="card-body">
+            <div style="white-space: pre-wrap;"><?php echo e($article->content); ?></div>
+          </div>
+        </div>
+
+        
+        <?php if($canEdit && ! $article->trashed() && ! $openDiscussion): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Nominate for Deletion</strong></div>
+            <div class="card-body">
+              <form action="<?php echo e(route('wiki.articles.deletions.store', $article)); ?>" method="POST">
+                <?php echo csrf_field(); ?>
+                <div class="mb-3">
+                  <label class="form-label">Reason *</label>
+                  <textarea name="reason" class="form-control" rows="3" required></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-danger">Open Deletion Discussion</button>
+              </form>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <?php if($openDiscussion): ?>
+          <div class="alert alert-warning d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-exclamation-triangle"></i> This article has an open deletion discussion.</span>
+            <a href="<?php echo e(route('wiki.deletions.show', $openDiscussion)); ?>" class="btn btn-sm btn-outline-dark">View Discussion</a>
+          </div>
+        <?php endif; ?>
+
+        <div class="card mb-4">
+          <div class="card-header"><strong>Revision History</strong></div>
+          <div class="card-body">
+            <?php $__empty_1 = true; $__currentLoopData = $article->revisions; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $revision): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+              <div class="d-flex justify-content-between border-bottom py-2">
+                <div>
+                  <div><?php echo e($revision->editor->full_name ?? 'Unknown'); ?></div>
+                  <div class="text-muted small"><?php echo e($revision->edit_summary ?: 'No summary provided.'); ?></div>
+                </div>
+                <div class="text-muted small text-end"><?php echo e($revision->created_at->format('M d, Y H:i')); ?></div>
+              </div>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+              <p class="text-muted mb-0">No public revisions.</p>
+            <?php endif; ?>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="col-lg-4">
+
+        
+        <?php if($canModerate): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Moderation (Sysop)</strong></div>
+            <div class="card-body">
+
+              <form action="<?php echo e(route('wiki.articles.protect', $article)); ?>" method="POST" class="mb-3">
+                <?php echo csrf_field(); ?>
+                <label class="form-label">Page Protection</label>
+                <select name="protection_level" class="form-select mb-2">
+                  <?php $__currentLoopData = \App\Models\Article::PROTECTION_LEVELS; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <option value="<?php echo e($value); ?>" <?php if($article->protection_level === $value): echo 'selected'; endif; ?>><?php echo e($label); ?></option>
+                  <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">Update Protection</button>
+              </form>
+
+              <?php if(! $article->trashed()): ?>
+                <form action="<?php echo e(route('wiki.articles.destroy', $article)); ?>" method="POST"
+                      onsubmit="return confirm('Delete this article?');">
+                  <?php echo csrf_field(); ?>
+                  <?php echo method_field('DELETE'); ?>
+                  <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                    <i class="bi bi-trash"></i> Delete Article
+                  </button>
+                </form>
+              <?php else: ?>
+                <form action="<?php echo e(route('wiki.articles.restore', $article->id)); ?>" method="POST">
+                  <?php echo csrf_field(); ?>
+                  <button type="submit" class="btn btn-sm btn-outline-success w-100">
+                    <i class="bi bi-arrow-counterclockwise"></i> Restore Article
+                  </button>
+                </form>
+              <?php endif; ?>
+
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <div class="card">
+          <div class="card-header"><strong>Details</strong></div>
+          <div class="card-body small text-muted">
+            <p class="mb-1"><strong>Slug:</strong> <?php echo e($article->slug); ?></p>
+            <p class="mb-1"><strong>Published:</strong> <?php echo e(optional($article->published_at)->format('M d, Y') ?? '—'); ?></p>
+            <?php if($article->protected_by): ?>
+              <p class="mb-1"><strong>Protected by:</strong> <?php echo e($article->protectedBy->full_name ?? '—'); ?></p>
+            <?php endif; ?>
+            <?php if($article->trashed()): ?>
+              <p class="mb-0 text-danger"><strong>Deleted</strong> <?php echo e(optional($article->deleted_at)->format('M d, Y H:i')); ?></p>
+            <?php endif; ?>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+ <?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal23a33f287873b564aaf305a1526eada4)): ?>
+<?php $attributes = $__attributesOriginal23a33f287873b564aaf305a1526eada4; ?>
+<?php unset($__attributesOriginal23a33f287873b564aaf305a1526eada4); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal23a33f287873b564aaf305a1526eada4)): ?>
+<?php $component = $__componentOriginal23a33f287873b564aaf305a1526eada4; ?>
+<?php unset($__componentOriginal23a33f287873b564aaf305a1526eada4); ?>
+<?php endif; ?>
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/modules/wiki/articles/show.blade.php ENDPATH**/ ?>

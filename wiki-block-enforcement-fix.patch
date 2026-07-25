@@ -5,7 +5,7 @@ index dd9def8..81af8f0 100644
 @@ -46,7 +46,7 @@ public function store(Request $request)
              'expires_at' => ['nullable', 'date', 'after:now'],
          ]);
- 
+
 -        WikiBlock::create([
 +        $block = WikiBlock::create([
              'user_id' => $data['target_type'] === 'user' ? $data['user_id'] : null,
@@ -14,7 +14,7 @@ index dd9def8..81af8f0 100644
 @@ -54,9 +54,23 @@ public function store(Request $request)
              'expires_at' => $data['expires_at'] ?? null,
          ]);
- 
+
 +        $autoblocked = 0;
 +        if ($data['target_type'] === 'ip') {
 +            $autoblocked = $this->autoblockAccountsBehindIp($block);
@@ -34,12 +34,12 @@ index dd9def8..81af8f0 100644
 -            ->with('success', 'Block applied.');
 +            ->with('success', $message);
      }
- 
+
      public function lift(WikiBlock $block)
 @@ -68,9 +82,53 @@ public function lift(WikiBlock $block)
              'lifted_at' => now(),
          ]);
- 
+
 +        // Lifting an IP block also lifts every account it autoblocked,
 +        // so an admin never has to remember to clear both separately.
 +        $block->autoblocks()->active()->get()->each(function (WikiBlock $autoblock) {
@@ -51,7 +51,7 @@ index dd9def8..81af8f0 100644
 +
          return back()->with('success', 'Block lifted.');
      }
- 
+
 +    /**
 +     * An IP block alone doesn't stop a registered account that was
 +     * using that IP — it just keeps its own session/cookies and can
@@ -175,7 +175,7 @@ index 4375855..f99f4c8 100644
 +            'is_autoblock' => 'boolean',
          ];
      }
- 
+
 +    /**
 +     * The IP block that spawned this autoblock on a registered account.
 +     */
@@ -205,7 +205,7 @@ index ec9b409..b33caa7 100644
              'module.permission' => \App\Http\Middleware\EnsureModulePermission::class,
 +            'wiki.not_blocked' => \App\Http\Middleware\EnsureNotWikiBlocked::class,
          ]);
- 
+
          // Chapa calls these routes server-to-server with no session and
 diff --git a/database/migrations/2026_07_25_120000_add_autoblock_to_wiki_blocks_table.php b/database/migrations/2026_07_25_120000_add_autoblock_to_wiki_blocks_table.php
 new file mode 100644
@@ -255,15 +255,31 @@ index 0000000..9b61504
 +    }
 +};
 diff --git a/routes/web.php b/routes/web.php
-index bb406dc..792c1b7 100644
+index bb406dc..61222c9 100644
 --- a/routes/web.php
 +++ b/routes/web.php
-@@ -497,22 +497,29 @@
+@@ -497,22 +497,39 @@
                  ->group(function () {
- 
+
                      Route::get('/', [WikiArticleController::class, 'index'])->name('index');
 -                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
 -                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
++
++                    // A blocked user/IP can still browse the wiki (same as
++                    // Wikipedia) but every action that creates, edits, or
++                    // otherwise changes content is gated behind an active-
++                    // block check.
++                    //
++                    // NOTE: literal segments ('create') must be registered
++                    // before the wildcard '{article}' routes below, or
++                    // Laravel matches '{article}' first and tries to
++                    // route-model-bind the literal string "create" as an
++                    // article ID.
++                    Route::middleware('wiki.not_blocked')->group(function () {
++                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
++                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
++                    });
++
                      Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
 -                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
 -                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
@@ -279,13 +295,7 @@ index bb406dc..792c1b7 100644
 -                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
 -                        ->name('deletions.store');
 +
-+                    // A blocked user/IP can still browse the wiki (same as
-+                    // Wikipedia) but every action that creates, edits, or
-+                    // otherwise changes content is gated behind an active-
-+                    // block check.
 +                    Route::middleware('wiki.not_blocked')->group(function () {
-+                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
-+                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
 +                        Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
 +                        Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 +
@@ -301,14 +311,14 @@ index bb406dc..792c1b7 100644
 +                            ->name('deletions.store');
 +                    });
                  });
- 
+
              Route::prefix('deletions')
-@@ -521,10 +528,13 @@
- 
+@@ -521,10 +538,13 @@
+
                      Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
                      Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
 -                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
- 
+
 -                    // Administrator (Sysop)
 -                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
 +                    Route::middleware('wiki.not_blocked')->group(function () {
@@ -318,5 +328,5 @@ index bb406dc..792c1b7 100644
 +                        Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
 +                    });
                  });
- 
+
              // Administrator (Sysop): block disruptive users/IPs
