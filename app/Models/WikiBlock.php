@@ -9,6 +9,8 @@ class WikiBlock extends Model
     protected $fillable = [
         'user_id',
         'ip_address',
+        'parent_block_id',
+        'is_autoblock',
         'blocked_by',
         'reason',
         'expires_at',
@@ -21,7 +23,24 @@ class WikiBlock extends Model
         return [
             'expires_at' => 'datetime',
             'lifted_at' => 'datetime',
+            'is_autoblock' => 'boolean',
         ];
+    }
+
+    /**
+     * The IP block that spawned this autoblock on a registered account.
+     */
+    public function parentBlock()
+    {
+        return $this->belongsTo(self::class, 'parent_block_id');
+    }
+
+    /**
+     * Autoblocks on accounts that were logged in from a blocked IP.
+     */
+    public function autoblocks()
+    {
+        return $this->hasMany(self::class, 'parent_block_id');
     }
 
     public function user()

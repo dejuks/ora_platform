@@ -497,22 +497,29 @@ Route::middleware('auth')->group(function () {
                 ->group(function () {
 
                     Route::get('/', [WikiArticleController::class, 'index'])->name('index');
-                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
-                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
                     Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
-                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
-                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 
-                    // Administrator (Sysop) — the protect/restore forms
-                    // submit plain POST (no @method spoofing), hence POST here.
-                    Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
-                    Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
-                    Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
-                        ->withTrashed()->name('restore');
+                    // A blocked user/IP can still browse the wiki (same as
+                    // Wikipedia) but every action that creates, edits, or
+                    // otherwise changes content is gated behind an active-
+                    // block check.
+                    Route::middleware('wiki.not_blocked')->group(function () {
+                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
+                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+                        Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
+                        Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 
-                    // Nominate this article for deletion (Articles for Deletion)
-                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
-                        ->name('deletions.store');
+                        // Administrator (Sysop) — the protect/restore forms
+                        // submit plain POST (no @method spoofing), hence POST here.
+                        Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
+                        Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
+                        Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
+                            ->withTrashed()->name('restore');
+
+                        // Nominate this article for deletion (Articles for Deletion)
+                        Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
+                            ->name('deletions.store');
+                    });
                 });
 
             Route::prefix('deletions')
@@ -521,10 +528,13 @@ Route::middleware('auth')->group(function () {
 
                     Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
                     Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
-                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
 
-                    // Administrator (Sysop)
-                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
+                    Route::middleware('wiki.not_blocked')->group(function () {
+                        Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
+
+                        // Administrator (Sysop)
+                        Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
+                    });
                 });
 
             // Administrator (Sysop): block disruptive users/IPs

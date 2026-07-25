@@ -1,0 +1,322 @@
+diff --git a/app/Http/Controllers/Wiki/BlockController.php b/app/Http/Controllers/Wiki/BlockController.php
+index dd9def8..81af8f0 100644
+--- a/app/Http/Controllers/Wiki/BlockController.php
++++ b/app/Http/Controllers/Wiki/BlockController.php
+@@ -46,7 +46,7 @@ public function store(Request $request)
+             'expires_at' => ['nullable', 'date', 'after:now'],
+         ]);
+ 
+-        WikiBlock::create([
++        $block = WikiBlock::create([
+             'user_id' => $data['target_type'] === 'user' ? $data['user_id'] : null,
+             'ip_address' => $data['target_type'] === 'ip' ? $data['ip_address'] : null,
+             'blocked_by' => Auth::id(),
+@@ -54,9 +54,23 @@ public function store(Request $request)
+             'expires_at' => $data['expires_at'] ?? null,
+         ]);
+ 
++        $autoblocked = 0;
++        if ($data['target_type'] === 'ip') {
++            $autoblocked = $this->autoblockAccountsBehindIp($block);
++        }
++
++        $message = 'Block applied.';
++        if ($autoblocked > 0) {
++            $message .= ' '.trans_choice(
++                '1 account logged in from this IP was also suspended (autoblock).|:count accounts logged in from this IP were also suspended (autoblock).',
++                $autoblocked,
++                ['count' => $autoblocked]
++            );
++        }
++
+         return redirect()
+             ->route('wiki.blocks.index')
+-            ->with('success', 'Block applied.');
++            ->with('success', $message);
+     }
+ 
+     public function lift(WikiBlock $block)
+@@ -68,9 +82,53 @@ public function lift(WikiBlock $block)
+             'lifted_at' => now(),
+         ]);
+ 
++        // Lifting an IP block also lifts every account it autoblocked,
++        // so an admin never has to remember to clear both separately.
++        $block->autoblocks()->active()->get()->each(function (WikiBlock $autoblock) {
++            $autoblock->update([
++                'lifted_by' => Auth::id(),
++                'lifted_at' => now(),
++            ]);
++        });
++
+         return back()->with('success', 'Block lifted.');
+     }
+ 
++    /**
++     * An IP block alone doesn't stop a registered account that was
++     * using that IP — it just keeps its own session/cookies and can
++     * keep editing. Mirror MediaWiki's "autoblock": find any account
++     * that most recently logged in from this IP and place a linked
++     * block directly on the account, so it stays suspended even if
++     * it later switches to a different IP.
++     */
++    protected function autoblockAccountsBehindIp(WikiBlock $ipBlock): int
++    {
++        $accounts = User::where('last_login_ip', $ipBlock->ip_address)->get();
++
++        $count = 0;
++        foreach ($accounts as $account) {
++            $alreadyBlocked = WikiBlock::active()->where('user_id', $account->id)->exists();
++
++            if ($alreadyBlocked) {
++                continue;
++            }
++
++            WikiBlock::create([
++                'user_id' => $account->id,
++                'parent_block_id' => $ipBlock->id,
++                'is_autoblock' => true,
++                'blocked_by' => Auth::id(),
++                'reason' => "Autoblock: account was logged in from blocked IP {$ipBlock->ip_address}. ({$ipBlock->reason})",
++                'expires_at' => $ipBlock->expires_at,
++            ]);
++
++            $count++;
++        }
++
++        return $count;
++    }
++
+     protected function authorizePermission(string $permission): void
+     {
+         abort_unless(
+diff --git a/app/Http/Middleware/EnsureNotWikiBlocked.php b/app/Http/Middleware/EnsureNotWikiBlocked.php
+new file mode 100644
+index 0000000..24b87bb
+--- /dev/null
++++ b/app/Http/Middleware/EnsureNotWikiBlocked.php
+@@ -0,0 +1,59 @@
++<?php
++
++namespace App\Http\Middleware;
++
++use App\Models\WikiBlock;
++use Closure;
++use Illuminate\Http\Request;
++use Illuminate\Support\Facades\Auth;
++
++/**
++ * WikiBlock records were only ever written (BlockController@store),
++ * never read anywhere else — so a Sysop blocking a user or an IP had
++ * zero effect on what that user/IP could actually do. This middleware
++ * is what makes a block real.
++ *
++ * It also closes the specific gap that was reported: a block created
++ * with target_type=ip only stores ip_address (user_id is null), so a
++ * registered account logged in from that IP was never restricted.
++ * Here we check the block against BOTH the authenticated user_id AND
++ * the current request IP, so an IP block stops that account's actions
++ * immediately, for as long as they use that IP. BlockController also
++ * creates a linked "autoblock" on the account itself, so the account
++ * stays suspended even if it switches to a different IP afterwards.
++ */
++class EnsureNotWikiBlocked
++{
++    public function handle(Request $request, Closure $next)
++    {
++        $userId = Auth::id();
++        $ip = $request->ip();
++
++        $block = WikiBlock::active()
++            ->where(function ($query) use ($userId, $ip) {
++                $query->where('ip_address', $ip);
++
++                if ($userId) {
++                    $query->orWhere('user_id', $userId);
++                }
++            })
++            ->latest()
++            ->first();
++
++        if ($block) {
++            abort(403, $this->message($block));
++        }
++
++        return $next($request);
++    }
++
++    protected function message(WikiBlock $block): string
++    {
++        $scope = $block->user_id ? 'Your account is blocked' : 'Your IP address is blocked';
++        $until = $block->expires_at
++            ? 'until '.$block->expires_at->format('M j, Y H:i').' UTC'
++            : 'indefinitely';
++
++        return "{$scope} from editing {$until}. Reason: {$block->reason}";
++    }
++}
+diff --git a/app/Models/WikiBlock.php b/app/Models/WikiBlock.php
+index 4375855..f99f4c8 100644
+--- a/app/Models/WikiBlock.php
++++ b/app/Models/WikiBlock.php
+@@ -9,6 +9,8 @@ class WikiBlock extends Model
+     protected $fillable = [
+         'user_id',
+         'ip_address',
++        'parent_block_id',
++        'is_autoblock',
+         'blocked_by',
+         'reason',
+         'expires_at',
+@@ -21,9 +23,26 @@ protected function casts(): array
+         return [
+             'expires_at' => 'datetime',
+             'lifted_at' => 'datetime',
++            'is_autoblock' => 'boolean',
+         ];
+     }
+ 
++    /**
++     * The IP block that spawned this autoblock on a registered account.
++     */
++    public function parentBlock()
++    {
++        return $this->belongsTo(self::class, 'parent_block_id');
++    }
++
++    /**
++     * Autoblocks on accounts that were logged in from a blocked IP.
++     */
++    public function autoblocks()
++    {
++        return $this->hasMany(self::class, 'parent_block_id');
++    }
++
+     public function user()
+     {
+         return $this->belongsTo(User::class);
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index ec9b409..b33caa7 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -16,6 +16,7 @@
+             'module.access' => \App\Http\Middleware\EnsureModuleAccess::class,
+             'module.admin' => \App\Http\Middleware\EnsureModuleAdmin::class,
+             'module.permission' => \App\Http\Middleware\EnsureModulePermission::class,
++            'wiki.not_blocked' => \App\Http\Middleware\EnsureNotWikiBlocked::class,
+         ]);
+ 
+         // Chapa calls these routes server-to-server with no session and
+diff --git a/database/migrations/2026_07_25_120000_add_autoblock_to_wiki_blocks_table.php b/database/migrations/2026_07_25_120000_add_autoblock_to_wiki_blocks_table.php
+new file mode 100644
+index 0000000..9b61504
+--- /dev/null
++++ b/database/migrations/2026_07_25_120000_add_autoblock_to_wiki_blocks_table.php
+@@ -0,0 +1,41 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++/**
++ * Root cause of "blocked by IP, but the account still works": a
++ * WikiBlock created with target_type=ip only ever stored the IP.
++ * There was nothing tying it back to the registered account that
++ * was using that IP, so the account was never actually restricted.
++ *
++ * This adds the linkage needed for an "autoblock" — when a Sysop
++ * blocks an IP, any account logged in from that IP is blocked too,
++ * and lifting the parent block lifts the autoblock with it.
++ */
++return new class extends Migration
++{
++    public function up(): void
++    {
++        Schema::table('wiki_blocks', function (Blueprint $table) {
++            $table->foreignId('parent_block_id')
++                ->nullable()
++                ->after('ip_address')
++                ->constrained('wiki_blocks')
++                ->cascadeOnDelete();
++
++            $table->boolean('is_autoblock')->default(false)->after('parent_block_id');
++
++            $table->index('parent_block_id');
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::table('wiki_blocks', function (Blueprint $table) {
++            $table->dropConstrainedForeignId('parent_block_id');
++            $table->dropColumn('is_autoblock');
++        });
++    }
++};
+diff --git a/routes/web.php b/routes/web.php
+index bb406dc..792c1b7 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -497,22 +497,29 @@
+                 ->group(function () {
+ 
+                     Route::get('/', [WikiArticleController::class, 'index'])->name('index');
+-                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
+-                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+                     Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
+-                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
+-                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
+-
+-                    // Administrator (Sysop) — the protect/restore forms
+-                    // submit plain POST (no @method spoofing), hence POST here.
+-                    Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
+-                    Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
+-                    Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
+-                        ->withTrashed()->name('restore');
+-
+-                    // Nominate this article for deletion (Articles for Deletion)
+-                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
+-                        ->name('deletions.store');
++
++                    // A blocked user/IP can still browse the wiki (same as
++                    // Wikipedia) but every action that creates, edits, or
++                    // otherwise changes content is gated behind an active-
++                    // block check.
++                    Route::middleware('wiki.not_blocked')->group(function () {
++                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
++                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
++                        Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
++                        Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
++
++                        // Administrator (Sysop) — the protect/restore forms
++                        // submit plain POST (no @method spoofing), hence POST here.
++                        Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
++                        Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
++                        Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
++                            ->withTrashed()->name('restore');
++
++                        // Nominate this article for deletion (Articles for Deletion)
++                        Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
++                            ->name('deletions.store');
++                    });
+                 });
+ 
+             Route::prefix('deletions')
+@@ -521,10 +528,13 @@
+ 
+                     Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
+                     Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
+-                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
+ 
+-                    // Administrator (Sysop)
+-                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
++                    Route::middleware('wiki.not_blocked')->group(function () {
++                        Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
++
++                        // Administrator (Sysop)
++                        Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
++                    });
+                 });
+ 
+             // Administrator (Sysop): block disruptive users/IPs
