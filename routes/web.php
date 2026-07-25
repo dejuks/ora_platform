@@ -1,5 +1,8 @@
 <?php
 
+use App\Http\Controllers\Account\ActivityLogController;
+use App\Http\Controllers\Account\ProfileController as AccountProfileController;
+use App\Http\Controllers\Account\SettingsController as AccountSettingsController;
 use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
@@ -11,6 +14,7 @@ use App\Http\Controllers\Journal\PublicController as JournalPublicController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JoinController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
 use App\Http\Controllers\Ebook\BookController as EbookBookController;
@@ -254,6 +258,65 @@ Route::middleware('auth')->group(function () {
     // module admin/member to their module, otherwise a no-access page.
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
+
+    /*
+    |--------------------------------------------------------------------------
+    | ACCOUNT — My Profile, Settings, Activity Log
+    |--------------------------------------------------------------------------
+    |
+    | Available to every logged-in user regardless of module, via the
+    | account dropdown in the top-right of the header.
+    |
+    */
+
+    Route::prefix('account')
+        ->as('account.')
+        ->group(function () {
+
+            Route::get('profile', [AccountProfileController::class, 'edit'])
+                ->name('profile.edit');
+
+            Route::put('profile', [AccountProfileController::class, 'update'])
+                ->name('profile.update');
+
+            Route::post('profile/photo', [AccountProfileController::class, 'updatePhoto'])
+                ->name('profile.photo');
+
+            Route::put('profile/password', [AccountProfileController::class, 'updatePassword'])
+                ->name('profile.password');
+
+            Route::get('settings', [AccountSettingsController::class, 'edit'])
+                ->name('settings.edit');
+
+            Route::put('settings', [AccountSettingsController::class, 'update'])
+                ->name('settings.update');
+
+            Route::get('activity-log', [ActivityLogController::class, 'index'])
+                ->name('activity.index');
+        });
+
+    /*
+    |--------------------------------------------------------------------------
+    | NOTIFICATIONS — in-app notification bell + full list
+    |--------------------------------------------------------------------------
+    */
+
+    Route::prefix('notifications')
+        ->as('notifications.')
+        ->group(function () {
+
+            Route::get('/', [NotificationController::class, 'index'])
+                ->name('index');
+
+            Route::get('{notification}/open', [NotificationController::class, 'open'])
+                ->name('open');
+
+            Route::post('{notification}/read', [NotificationController::class, 'markRead'])
+                ->name('read');
+
+            Route::post('mark-all-read', [NotificationController::class, 'markAllRead'])
+                ->name('mark-all-read');
+        });
 
     /*
     |--------------------------------------------------------------------------

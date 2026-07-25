@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,8 @@ class AuthController extends Controller
             'failed_login_attempts' => 0,
         ])->save();
 
+        ActivityLogger::log('login', 'Logged in', user: $user);
+
         // Where the user lands next (Super Admin panel, their module, or
         // a no-access page) is decided in one place: DashboardController.
         return redirect()->route('dashboard');
@@ -58,6 +61,12 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
+        $user = Auth::user();
+
+        if ($user) {
+            ActivityLogger::log('logout', 'Logged out', user: $user);
+        }
+
         Auth::logout();
 
         $request->session()->invalidate();

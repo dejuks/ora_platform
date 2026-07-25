@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
                 $menus = SidebarService::getMenu();
 
                 $view->with('sidebarMenus', $menus);
+
+                $user = auth()->user();
+
+                $view->with('headerNotifications', $user->notifications()->latest()->take(5)->get());
+                $view->with('headerUnreadCount', $user->unreadNotifications()->count());
             }
         });
     }

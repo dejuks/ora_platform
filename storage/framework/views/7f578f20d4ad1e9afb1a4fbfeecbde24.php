@@ -92,53 +92,57 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
         </button>
 
         <!-- Notifications -->
+        <?php
+          $headerNotifications = $headerNotifications ?? collect();
+          $headerUnreadCount = $headerUnreadCount ?? 0;
+          $notifIcon = fn ($type) => match ($type) {
+              'success' => 'bi-check-circle',
+              'warning' => 'bi-exclamation-triangle',
+              'danger' => 'bi-x-circle',
+              default => 'bi-info-circle',
+          };
+        ?>
         <div class="header-action dropdown notification-dropdown">
           <button class="dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
             <i class="bi bi-bell"></i>
-            <span class="badge">3</span>
+            <?php if($headerUnreadCount > 0): ?>
+              <span class="badge"><?php echo e($headerUnreadCount > 9 ? '9+' : $headerUnreadCount); ?></span>
+            <?php endif; ?>
           </button>
           <div class="dropdown-menu dropdown-menu-end">
             <div class="notification-header">
               <div>
-                <span>Today</span>
+                <span><?php echo e($headerUnreadCount); ?> unread</span>
                 <h6>Notifications</h6>
               </div>
-              <a href="#" data-notification-action="mark-all-read">Mark all read</a>
+              <form action="<?php echo e(route('notifications.mark-all-read')); ?>" method="POST">
+                <?php echo csrf_field(); ?>
+                <button type="submit" class="btn-link" style="background:none;border:0;padding:0;">Mark all read</button>
+              </form>
             </div>
             <div class="notification-list">
-              <div class="notification-item unread">
-                <div class="notification-icon success">
-                  <i class="bi bi-check-circle"></i>
+              <?php $__empty_1 = true; $__currentLoopData = $headerNotifications; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $notification): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <a href="<?php echo e(route('notifications.open', $notification->id)); ?>"
+                   class="notification-item <?php echo e($notification->read_at ? '' : 'unread'); ?>">
+                  <div class="notification-icon <?php echo e($notification->data['type'] ?? 'info'); ?>">
+                    <i class="bi <?php echo e($notification->data['icon'] ?? $notifIcon($notification->data['type'] ?? 'info')); ?>"></i>
+                  </div>
+                  <div class="notification-content">
+                    <div class="notification-title"><?php echo e($notification->data['title'] ?? 'Notification'); ?></div>
+                    <div class="notification-text"><?php echo e($notification->data['message'] ?? ''); ?></div>
+                    <div class="notification-time"><?php echo e($notification->created_at->diffForHumans()); ?></div>
+                  </div>
+                </a>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                <div class="notification-item">
+                  <div class="notification-content">
+                    <div class="notification-text">You're all caught up — no notifications yet.</div>
+                  </div>
                 </div>
-                <div class="notification-content">
-                  <div class="notification-title">Order Completed</div>
-                  <div class="notification-text">Your order #12345 has been delivered</div>
-                  <div class="notification-time">5 min ago</div>
-                </div>
-              </div>
-              <div class="notification-item unread">
-                <div class="notification-icon warning">
-                  <i class="bi bi-exclamation-triangle"></i>
-                </div>
-                <div class="notification-content">
-                  <div class="notification-title">Low Storage</div>
-                  <div class="notification-text">Server storage is running low (85% used)</div>
-                  <div class="notification-time">1 hour ago</div>
-                </div>
-              </div>
-              <div class="notification-item">
-                <div class="notification-icon info">
-                  <i class="bi bi-info-circle"></i>
-                </div>
-                <div class="notification-content">
-                  <div class="notification-title">New Feature</div>
-                  <div class="notification-text">Dark mode is now available</div>
-                  <div class="notification-time">2 hours ago</div>
-                </div>
-              </div>
+              <?php endif; ?>
             </div>
             <div class="notification-footer">
-              <a href="notifications.html">View all notifications</a>
+              <a href="<?php echo e(route('notifications.index')); ?>">View all notifications</a>
             </div>
           </div>
         </div>
@@ -171,17 +175,17 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
               <span><?php echo e($headerUserLabel); ?></span>
             </li>
             <li>
-              <a class="dropdown-item" href="profile.html">
+              <a class="dropdown-item" href="<?php echo e(route('account.profile.edit')); ?>">
                 <i class="bi bi-person"></i> My Profile
               </a>
             </li>
             <li>
-              <a class="dropdown-item" href="settings.html">
+              <a class="dropdown-item" href="<?php echo e(route('account.settings.edit')); ?>">
                 <i class="bi bi-gear"></i> Settings
               </a>
             </li>
             <li>
-              <a class="dropdown-item" href="activity.html">
+              <a class="dropdown-item" href="<?php echo e(route('account.activity.index')); ?>">
                 <i class="bi bi-activity"></i> Activity Log
               </a>
             </li>
@@ -241,29 +245,40 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
       </button>
 
       <!-- Notifications -->
-      <a href="notifications.html" class="mobile-menu-item">
+      <a href="<?php echo e(route('notifications.index')); ?>" class="mobile-menu-item">
         <i class="bi bi-bell"></i>
-        <span class="badge">3</span>
+        <?php if(($headerUnreadCount ?? 0) > 0): ?>
+          <span class="badge"><?php echo e($headerUnreadCount > 9 ? '9+' : $headerUnreadCount); ?></span>
+        <?php endif; ?>
         <span class="mobile-menu-label">Notifications</span>
       </a>
 
       <!-- Profile -->
-      <a href="profile.html" class="mobile-menu-item">
+      <a href="<?php echo e(route('account.profile.edit')); ?>" class="mobile-menu-item">
         <i class="bi bi-person"></i>
         <span class="mobile-menu-label">Profile</span>
       </a>
 
       <!-- Settings -->
-      <a href="settings.html" class="mobile-menu-item">
+      <a href="<?php echo e(route('account.settings.edit')); ?>" class="mobile-menu-item">
         <i class="bi bi-gear"></i>
         <span class="mobile-menu-label">Settings</span>
       </a>
 
-      <!-- Sign Out -->
-      <a href="auth-login.html" class="mobile-menu-item mobile-menu-item-danger">
-        <i class="bi bi-box-arrow-right"></i>
-        <span class="mobile-menu-label">Sign Out</span>
+      <!-- Activity Log -->
+      <a href="<?php echo e(route('account.activity.index')); ?>" class="mobile-menu-item">
+        <i class="bi bi-activity"></i>
+        <span class="mobile-menu-label">Activity Log</span>
       </a>
+
+      <!-- Sign Out -->
+      <form action="<?php echo e(route('logout')); ?>" method="POST">
+        <?php echo csrf_field(); ?>
+        <button type="submit" class="mobile-menu-item mobile-menu-item-danger" style="width:100%;border:0;background:none;">
+          <i class="bi bi-box-arrow-right"></i>
+          <span class="mobile-menu-label">Sign Out</span>
+        </button>
+      </form>
     </div>
   </div>
 

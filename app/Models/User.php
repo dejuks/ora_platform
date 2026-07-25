@@ -33,6 +33,10 @@ class User extends Authenticatable
 
         'profile_photo',
 
+        'notify_in_app',
+
+        'notify_email',
+
         'password',
 
         'status',
@@ -68,6 +72,10 @@ class User extends Authenticatable
         return [
 
             'is_super_admin' => 'boolean',
+
+            'notify_in_app' => 'boolean',
+
+            'notify_email' => 'boolean',
 
             'email_verified' => 'boolean',
 
@@ -125,6 +133,14 @@ public function researcherProfile()
 public function libraryMember()
 {
     return $this->hasOne(LibraryMember::class);
+}
+
+/**
+ * This user's audit trail — powers the Activity Log page.
+ */
+public function activityLogs()
+{
+    return $this->hasMany(ActivityLog::class)->latest();
 }
 
 /**
