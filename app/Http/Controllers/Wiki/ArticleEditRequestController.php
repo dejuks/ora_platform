@@ -47,6 +47,8 @@ class ArticleEditRequestController extends Controller
 
         abort_unless($user->hasModulePermission('wiki', 'edit-articles'), 403, 'You do not have permission to edit articles.');
 
+        abort_unless($article->isVisibleTo($user), 404);
+
         if ($article->author_id === $user->id) {
             return back()->with('info', 'You already own this article — you can edit it directly.');
         }

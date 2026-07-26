@@ -13,7 +13,7 @@
 
     <div class="mb-4">
       <h1 class="h3 mb-1">New Article</h1>
-      <p class="text-muted mb-0">Create a new Oromo Wikipedia article. It publishes immediately and every edit is logged.</p>
+      <p class="text-muted mb-0">Save as a private draft only you (and Administrators) can see, or publish it immediately for everyone. Every edit is logged.</p>
     </div>
 
     <?php if($errors->any()): ?>
@@ -39,7 +39,7 @@
 
           <div class="col-12">
             <label class="form-label">Content *</label>
-            <textarea name="content" class="form-control" rows="14" required><?php echo e(old('content')); ?></textarea>
+            <textarea id="content" name="content" class="form-control" rows="14" required><?php echo e(old('content')); ?></textarea>
           </div>
 
           <div class="col-12">
@@ -72,13 +72,20 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Publish Article</button>
-        <a href="<?php echo e(route('wiki.articles.index')); ?>" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+          <i class="bi bi-file-earmark"></i> Save as Draft
+        </button>
+        <button type="submit" name="action" value="publish" class="btn btn-primary">
+          <i class="bi bi-send"></i> Publish
+        </button>
+        <a href="<?php echo e(route('wiki.articles.index')); ?>" class="btn btn-outline-secondary ms-auto">Cancel</a>
       </div>
 
     </form>
 
   </div>
+
+  <?php echo $__env->make('modules.wiki.articles._content-editor', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>

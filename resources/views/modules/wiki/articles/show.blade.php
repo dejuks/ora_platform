@@ -17,7 +17,7 @@
           @endif
         </h1>
         <p class="text-muted mb-0">
-          <span class="badge bg-secondary">{{ $article->statusLabel() }}</span>
+          <span class="badge {{ $article->isDraft() ? 'bg-secondary' : 'bg-success' }}">{{ $article->statusLabel() }}</span>
           @if($article->protection_level !== 'none')
             <span class="badge bg-warning text-dark">{{ $article->protectionLabel() }}</span>
           @endif
@@ -61,9 +61,22 @@
             @endif
           </div>
           <div class="card-body">
-            <div style="white-space: pre-wrap;">{{ $article->content }}</div>
+            <div class="wiki-article-body">{!! $article->content !!}</div>
           </div>
         </div>
+
+        @push('styles')
+          <style>
+            .wiki-article-body{ font-size: 14.5px; line-height: 1.7; }
+            .wiki-article-body p{ margin-bottom: 1em; }
+            .wiki-article-body h2{ font-size: 21px; font-weight: 600; margin: 24px 0 10px; padding-bottom: 6px; border-bottom: 1px solid #eaecf0; }
+            .wiki-article-body h3{ font-size: 17px; font-weight: 600; margin: 18px 0 8px; }
+            .wiki-article-body ul, .wiki-article-body ol{ padding-left: 22px; margin-bottom: 1em; }
+            .wiki-article-body blockquote{ border-left: 3px solid #dee2e6; padding-left: 14px; color: #6c757d; margin: 1em 0; }
+            .wiki-article-body table{ border-collapse: collapse; margin-bottom: 1em; }
+            .wiki-article-body table td, .wiki-article-body table th{ border: 1px solid #dee2e6; padding: 6px 10px; }
+          </style>
+        @endpush
 
         {{-- Owner-approval editing: anyone with edit-articles who isn't
              the owner/admin, and doesn't already hold an unused approval,
