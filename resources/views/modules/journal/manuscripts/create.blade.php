@@ -4,7 +4,7 @@
 
     <div class="mb-4">
       <h1 class="h3 mb-1">Submit Manuscript</h1>
-      <p class="text-muted mb-0">Provide your manuscript details and upload the file for review.</p>
+      <p class="text-muted mb-0">Save as a private draft only you can see, or push it into the review workflow when it's ready.</p>
     </div>
 
     @if($errors->any())
@@ -40,16 +40,34 @@
           </div>
 
           <div class="col-md-6">
-            <label class="form-label">Manuscript File (PDF/DOC/DOCX, max 10MB) *</label>
-            <input type="file" name="manuscript_file" class="form-control" required>
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+              <option value="">— Select a category —</option>
+              @foreach($categories as $category)
+                <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
+                  {{ $category->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Manuscript File (PDF/DOC/DOCX, max 10MB)</label>
+            <input type="file" name="manuscript_file" class="form-control">
+            <small class="text-muted">Not required to save a draft — required before you push it for review.</small>
           </div>
 
         </div>
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Submit Manuscript</button>
-        <a href="{{ route('journal.manuscripts.index') }}" class="btn btn-outline-secondary">Cancel</a>
+        <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+          <i class="bi bi-file-earmark"></i> Save as Draft
+        </button>
+        <button type="submit" name="action" value="submit" class="btn btn-primary">
+          <i class="bi bi-send"></i> Push for Review
+        </button>
+        <a href="{{ route('journal.manuscripts.index') }}" class="btn btn-outline-secondary ms-auto">Cancel</a>
       </div>
 
     </form>

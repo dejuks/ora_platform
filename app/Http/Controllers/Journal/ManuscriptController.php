@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Journal;
 use App\Http\Controllers\Controller;
 use App\Models\Manuscript;
 use App\Models\ManuscriptReview;
+use App\Models\JournalCategory;
 use App\Models\JournalSetting;
 use App\Models\User;
+use App\Notifications\AppNotification;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +32,8 @@ use Mews\Purifier\Facades\Purifier;
  */
 class ManuscriptController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -41,8 +46,14 @@ class ManuscriptController extends Controller
         } elseif (! $this->isEditorial($user) && ! $user->isSuperAdmin()) {
             // Plain Author: only their own submissions.
             $query->where('author_id', $user->id);
+        } else {
+            // Journal Manager / EIC / Associate Editor / Super Admin see
+            // everything that's actually been pushed into the workflow —
+            // but not other people's drafts, which are private to the author.
+            $query->where(function ($q) use ($user) {
+                $q->where('status', '!=', 'draft')->orWhere('author_id', $user->id);
+            });
         }
-        // Journal Manager / EIC / Associate Editor / Super Admin see everything.
 
         $manuscripts = $query->paginate(15)->withQueryString();
 
@@ -51,7 +62,9 @@ class ManuscriptController extends Controller
 
     public function create()
     {
-        return view('modules.journal.manuscripts.create');
+        $categories = JournalCategory::active()->ordered()->get();
+
+        return view('modules.journal.manuscripts.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -60,7 +73,11 @@ class ManuscriptController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
-            'manuscript_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'category_id' => ['nullable', 'exists:journal_categories,id'],
+            // A draft can be saved without a file yet; pushing it into
+            // the review workflow requires one.
+            'manuscript_file' => ['required_if:action,submit', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'action' => ['required', 'in:draft,submit'],
         ]);
 
         // CKEditor runs client-side only — this endpoint still accepts
@@ -68,17 +85,39 @@ class ManuscriptController extends Controller
         // was actually submitted through the editor.
         $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
 
-        $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
+        $isSubmit = $data['action'] === 'submit';
+
+        if ($request->hasFile('manuscript_file')) {
+            $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
+        } else {
+            unset($data['manuscript_file']);
+        }
+
         $data['author_id'] = Auth::id();
-        $data['status'] = 'submitted';
-        $data['submitted_at'] = now();
+        $data['status'] = $isSubmit ? 'submitted' : 'draft';
+        $data['submitted_at'] = $isSubmit ? now() : null;
         $data['created_by'] = Auth::id();
+        unset($data['action']);
 
         $manuscript = Manuscript::create($data);
 
+        if ($isSubmit) {
+            $this->notifyPermissionHolders('journal', 'screen-submissions', new AppNotification(
+                title: 'New manuscript submitted',
+                message: "\"{$manuscript->title}\" was submitted by {$manuscript->author->full_name} and needs screening.",
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-file-earmark-text',
+                type: 'info',
+            ));
+        }
+
+        $message = $isSubmit
+            ? 'Manuscript submitted successfully.'
+            : 'Draft saved. Only you can see it until you push it for review.';
+
         return redirect()
             ->route('journal.manuscripts.show', $manuscript)
-            ->with('success', 'Manuscript submitted successfully.');
+            ->with('success', $message);
     }
 
     public function show(Manuscript $manuscript)
@@ -105,7 +144,9 @@ class ManuscriptController extends Controller
     {
         $this->authorizeAuthorEdit($manuscript);
 
-        return view('modules.journal.manuscripts.edit', compact('manuscript'));
+        $categories = JournalCategory::active()->ordered()->get();
+
+        return view('modules.journal.manuscripts.edit', compact('manuscript', 'categories'));
     }
 
     /**
@@ -121,11 +162,18 @@ class ManuscriptController extends Controller
     {
         $this->authorizeAuthorEdit($manuscript);
 
+        $isDraft = $manuscript->status === 'draft';
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
-            'manuscript_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'category_id' => ['nullable', 'exists:journal_categories,id'],
+            'manuscript_file' => [
+                $isDraft ? 'required_if:action,submit' : 'nullable',
+                'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240',
+            ],
+            'action' => [$isDraft ? 'required' : 'nullable', 'in:draft,submit'],
         ]);
 
         $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
@@ -138,6 +186,43 @@ class ManuscriptController extends Controller
             $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
         }
 
+        if ($isDraft) {
+            // A draft only ever moves between "still a draft" and
+            // "pushed into the review pipeline" — none of the
+            // resubmission/reviewer-reset logic below applies, since
+            // it has never been through screening or review yet.
+            $isSubmit = $data['action'] === 'submit';
+
+            $manuscript->update([
+                'title' => $data['title'],
+                'abstract' => $data['abstract'],
+                'keywords' => $data['keywords'] ?? null,
+                'category_id' => $data['category_id'] ?? $manuscript->category_id,
+                'manuscript_file' => $data['manuscript_file'] ?? $manuscript->manuscript_file,
+                'status' => $isSubmit ? 'submitted' : 'draft',
+                'submitted_at' => $isSubmit ? now() : null,
+                'updated_by' => Auth::id(),
+            ]);
+
+            if ($isSubmit) {
+                $this->notifyPermissionHolders('journal', 'screen-submissions', new AppNotification(
+                    title: 'New manuscript submitted',
+                    message: "\"{$manuscript->title}\" was submitted by {$manuscript->author->full_name} and needs screening.",
+                    url: route('journal.manuscripts.show', $manuscript),
+                    icon: 'bi-file-earmark-text',
+                    type: 'info',
+                ));
+            }
+
+            $message = $isSubmit
+                ? 'Manuscript submitted successfully.'
+                : 'Draft saved. Only you can see it until you push it for review.';
+
+            return redirect()
+                ->route('journal.manuscripts.show', $manuscript)
+                ->with('success', $message);
+        }
+
         DB::transaction(function () use ($manuscript, $data) {
             $wasDeskRejectedOrRejected = in_array($manuscript->status, ['desk_rejected', 'rejected']);
             $wasRevisionRequested = $manuscript->status === 'revision_requested';
@@ -148,6 +233,7 @@ class ManuscriptController extends Controller
                 'title' => $data['title'],
                 'abstract' => $data['abstract'],
                 'keywords' => $data['keywords'] ?? null,
+                'category_id' => $data['category_id'] ?? $manuscript->category_id,
                 'manuscript_file' => $data['manuscript_file'] ?? $manuscript->manuscript_file,
                 'status' => $newStatus,
                 'submitted_at' => now(),
@@ -163,7 +249,7 @@ class ManuscriptController extends Controller
                 // Same reviewers, fresh round on the revised file —
                 // clear their prior verdicts so the revised manuscript
                 // shows up as pending on their dashboard again.
-                $manuscript->reviews()->whereIn('status', ['assigned', 'submitted'])->get()->each(function ($review) {
+                $manuscript->reviews()->whereIn('status', ['assigned', 'submitted'])->get()->each(function ($review) use ($manuscript) {
                     $review->update([
                         'status' => 'assigned',
                         'recommendation' => null,
@@ -171,6 +257,14 @@ class ManuscriptController extends Controller
                         'comments_to_editor' => null,
                         'submitted_at' => null,
                     ]);
+
+                    $review->reviewer?->notify(new AppNotification(
+                        title: 'Revised manuscript ready for review',
+                        message: "The author revised \"{$manuscript->title}\" — your review is needed again.",
+                        url: route('journal.manuscripts.show', $manuscript),
+                        icon: 'bi-clipboard-check',
+                        type: 'info',
+                    ));
                 });
             }
 
@@ -180,6 +274,14 @@ class ManuscriptController extends Controller
                 // screening queue rather than looking "already handled".
                 $manuscript->associate_editor_id = null;
                 $manuscript->save();
+
+                $this->notifyPermissionHolders('journal', 'screen-submissions', new AppNotification(
+                    title: 'Manuscript resubmitted',
+                    message: "\"{$manuscript->title}\" was revised and resubmitted — it needs screening again.",
+                    url: route('journal.manuscripts.show', $manuscript),
+                    icon: 'bi-file-earmark-text',
+                    type: 'info',
+                ));
             }
         });
 
@@ -225,6 +327,33 @@ class ManuscriptController extends Controller
             'updated_by' => Auth::id(),
         ]);
 
+        if ($data['decision'] === 'advance') {
+            $manuscript->author?->notify(new AppNotification(
+                title: 'Manuscript passed screening',
+                message: "\"{$manuscript->title}\" passed editorial screening and will proceed to peer review.",
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-arrow-right-circle',
+                type: 'success',
+            ));
+
+            $this->notifyPermissionHolders('journal', 'assign-reviewers', new AppNotification(
+                title: 'Manuscript needs reviewers',
+                message: "\"{$manuscript->title}\" passed screening and needs reviewers assigned.",
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-people',
+                type: 'info',
+            ), excludeUserId: Auth::id());
+        } else {
+            $manuscript->author?->notify(new AppNotification(
+                title: 'Manuscript desk-rejected',
+                message: "\"{$manuscript->title}\" was desk-rejected at editorial screening."
+                    .($data['notes'] ?? null ? ' Notes: "'.$data['notes'].'"' : ''),
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-x-circle',
+                type: 'danger',
+            ));
+        }
+
         return back()->with('success', 'Manuscript screening recorded.');
     }
 
@@ -243,6 +372,8 @@ class ManuscriptController extends Controller
 
         DB::transaction(function () use ($data, $manuscript) {
 
+            $reviewers = User::whereIn('id', $data['reviewers'])->get();
+
             foreach ($data['reviewers'] as $reviewerId) {
 
                 ManuscriptReview::updateOrCreate(
@@ -259,6 +390,23 @@ class ManuscriptController extends Controller
                 'status' => 'under_review',
                 'updated_by' => Auth::id(),
             ]);
+
+            $reviewers->each(fn ($reviewer) => $reviewer->notify(new AppNotification(
+                title: 'New review assignment',
+                message: "You've been assigned to review \"{$manuscript->title}\""
+                    .(($data['due_date'] ?? null) ? ", due {$data['due_date']}." : '.'),
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-clipboard-check',
+                type: 'info',
+            )));
+
+            $manuscript->author?->notify(new AppNotification(
+                title: 'Reviewers assigned',
+                message: "Reviewers have been assigned to \"{$manuscript->title}\" — it's now under peer review.",
+                url: route('journal.manuscripts.show', $manuscript),
+                icon: 'bi-people',
+                type: 'info',
+            ));
         });
 
         return back()->with('success', 'Reviewer(s) assigned.');
@@ -283,6 +431,14 @@ class ManuscriptController extends Controller
 
         $review->update($data);
 
+        $this->notifyPermissionHolders('journal', 'recommend-decision', new AppNotification(
+            title: 'Review submitted',
+            message: "{$review->reviewer->full_name} submitted a review for \"{$manuscript->title}\" ({$data['recommendation']}).",
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-clipboard-check',
+            type: 'info',
+        ), excludeUserId: Auth::id());
+
         return back()->with('success', 'Review submitted. Thank you.');
     }
 
@@ -302,6 +458,14 @@ class ManuscriptController extends Controller
             'editor_decision_notes' => $data['recommendation_notes'],
             'updated_by' => Auth::id(),
         ]);
+
+        $this->notifyPermissionHolders('journal', 'make-final-decision', new AppNotification(
+            title: 'Recommendation ready for decision',
+            message: "{$manuscript->author->full_name}'s manuscript \"{$manuscript->title}\" has a recommendation awaiting your final decision.",
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-flag',
+            type: 'info',
+        ), excludeUserId: Auth::id());
 
         return back()->with('success', 'Recommendation sent to the Editor-in-Chief.');
     }
@@ -334,6 +498,38 @@ class ManuscriptController extends Controller
                 : $manuscript->publication_fee,
         ]);
 
+        $decisionNotifications = [
+            'accepted' => [
+                'title' => 'Manuscript accepted',
+                'message' => "Congratulations! \"{$manuscript->title}\" has been accepted for publication. "
+                    .'A publication fee must be paid before it can be published.',
+                'icon' => 'bi-check-circle',
+                'type' => 'success',
+            ],
+            'rejected' => [
+                'title' => 'Manuscript rejected',
+                'message' => "\"{$manuscript->title}\" was not accepted for publication.",
+                'icon' => 'bi-x-circle',
+                'type' => 'danger',
+            ],
+            'revision_requested' => [
+                'title' => 'Revisions requested',
+                'message' => "The Editor-in-Chief has requested revisions to \"{$manuscript->title}\".",
+                'icon' => 'bi-pencil-square',
+                'type' => 'warning',
+            ],
+        ][$data['decision']];
+
+        $manuscript->author?->notify(new AppNotification(
+            title: $decisionNotifications['title'],
+            message: $decisionNotifications['message'],
+            url: $data['decision'] === 'accepted'
+                ? route('journal.manuscripts.pay', $manuscript)
+                : route('journal.manuscripts.show', $manuscript),
+            icon: $decisionNotifications['icon'],
+            type: $decisionNotifications['type'],
+        ));
+
         return back()->with('success', 'Decision recorded.');
     }
 
@@ -360,6 +556,14 @@ class ManuscriptController extends Controller
             'published_at' => now(),
             'updated_by' => Auth::id(),
         ]);
+
+        $manuscript->author?->notify(new AppNotification(
+            title: 'Manuscript published',
+            message: "\"{$manuscript->title}\" has been published. DOI: {$manuscript->doi}",
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-journal-check',
+            type: 'success',
+        ));
 
         return back()->with('success', 'Manuscript published.');
     }
@@ -391,11 +595,18 @@ class ManuscriptController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->isSuperAdmin() || $this->isEditorial($user)) {
+        if ($manuscript->author_id === $user->id) {
             return;
         }
 
-        if ($manuscript->author_id === $user->id) {
+        // A draft is only visible to its author, full stop — it hasn't
+        // been pushed into the workflow yet, so no editorial role or
+        // reviewer has any reason to see it.
+        if ($manuscript->status === 'draft') {
+            abort(404);
+        }
+
+        if ($user->isSuperAdmin() || $this->isEditorial($user)) {
             return;
         }
 
