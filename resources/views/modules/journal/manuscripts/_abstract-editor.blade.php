@@ -1,8 +1,8 @@
 {{--
-    Rich-text editor for the article "content" textarea.
+    Rich-text editor for the manuscript "abstract" textarea.
 
-    Usage: @include('modules.wiki.articles._content-editor')
-    Expects a <textarea id="content" name="content"> to already exist
+    Usage: @include('modules.journal.manuscripts._abstract-editor')
+    Expects a <textarea id="abstract" name="abstract"> to already exist
     in the form above this include.
 
     CKEditor replaces the textarea visually but keeps it in the DOM;
@@ -13,9 +13,9 @@
 
 @push('styles')
   <style>
-    .ck-editor__editable_inline{
-      min-height: 360px;
-      max-height: 640px;
+    #abstract + .ck-editor .ck-editor__editable_inline{
+      min-height: 160px;
+      max-height: 420px;
       overflow-y: auto;
     }
   </style>
@@ -25,7 +25,7 @@
   <script src="https://cdn.ckeditor.com/ckeditor5/41.4.2/classic/ckeditor.js"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      var textarea = document.getElementById('content');
+      var textarea = document.getElementById('abstract');
       if (! textarea || typeof ClassicEditor === 'undefined') {
         return;
       }
@@ -34,19 +34,17 @@
       // over. If the textarea is still marked "required", the browser's
       // native validation tries to focus it to show the "please fill
       // this field" bubble, can't (it's hidden), and silently blocks
-      // the submit — which looks exactly like the Save/Publish buttons
-      // "not working". Drop the native required flag and enforce the
-      // same rule ourselves against the editor's actual content.
+      // the submit. Drop the native required flag and enforce the same
+      // rule ourselves against the editor's actual content.
       var wasRequired = textarea.hasAttribute('required');
       textarea.removeAttribute('required');
 
       ClassicEditor
         .create(textarea, {
           toolbar: [
-            'heading', '|',
             'bold', 'italic', 'underline', '|',
-            'link', 'bulletedList', 'numberedList', '|',
-            'blockQuote', 'insertTable', '|',
+            'subscript', 'superscript', '|',
+            'bulletedList', 'numberedList', '|',
             'undo', 'redo'
           ]
         })
@@ -62,11 +60,11 @@
             if (wasRequired && ! editor.getData().replace(/<[^>]*>/g, '').trim()) {
               event.preventDefault();
 
-              var alertBox = form.querySelector('.js-content-required-alert');
+              var alertBox = form.querySelector('.js-abstract-required-alert');
               if (! alertBox) {
                 alertBox = document.createElement('div');
-                alertBox.className = 'alert alert-danger js-content-required-alert';
-                alertBox.textContent = 'Content is required.';
+                alertBox.className = 'alert alert-danger js-abstract-required-alert';
+                alertBox.textContent = 'Abstract is required.';
                 form.prepend(alertBox);
               }
               alertBox.scrollIntoView({ behavior: 'smooth', block: 'center' });

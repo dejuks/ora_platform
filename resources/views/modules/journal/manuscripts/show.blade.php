@@ -36,7 +36,7 @@
         <div class="card mb-4">
           <div class="card-header"><strong>Abstract</strong></div>
           <div class="card-body">
-            <p>{{ $manuscript->abstract }}</p>
+            <div>{!! $manuscript->abstract !!}</div>
             @if($manuscript->keywords)
               <p class="text-muted mb-0"><strong>Keywords:</strong> {{ $manuscript->keywords }}</p>
             @endif

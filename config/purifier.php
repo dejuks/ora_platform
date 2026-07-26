@@ -42,6 +42,18 @@ return [
             'HTML.TargetBlank' => true,
         ],
 
+        // Matches the CKEditor toolbar in
+        // resources/views/modules/journal/manuscripts/_abstract-editor.blade.php
+        // Deliberately narrower than wiki_article — an abstract is a
+        // few paragraphs, not a formatted page, so no headings/tables/links.
+        'manuscript_abstract' => [
+            'HTML.Doctype' => 'HTML 4.01 Transitional',
+            'HTML.Allowed' => 'p,br,strong,em,u,sub,sup,ul,ol,li',
+            'CSS.AllowedProperties' => '',
+            'AutoFormat.AutoParagraph' => false,
+            'AutoFormat.RemoveEmpty' => true,
+        ],
+
     ],
 
 ];
