@@ -36,6 +36,12 @@
       </div>
     <?php endif; ?>
 
+    <div class="card mb-4">
+      <div class="card-body">
+        <?php echo $__env->make('modules.journal.manuscripts._workflow-steps', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+      </div>
+    </div>
+
     <form action="<?php echo e(route('journal.manuscripts.update', $manuscript)); ?>" method="POST" enctype="multipart/form-data">
       <?php echo csrf_field(); ?>
       <?php echo method_field('PUT'); ?>
@@ -57,6 +63,20 @@
             <label class="form-label">Keywords</label>
             <input type="text" name="keywords" class="form-control" value="<?php echo e(old('keywords', $manuscript->keywords)); ?>"
                    placeholder="Comma-separated">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+              <option value="">— Select a category —</option>
+              <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <option value="<?php echo e($category->id); ?>"
+                  <?php echo e(old('category_id', $manuscript->category_id) == $category->id ? 'selected' : ''); ?>>
+                  <?php echo e($category->name); ?>
+
+                </option>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </select>
           </div>
 
           <div class="col-md-6">
