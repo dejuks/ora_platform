@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Journal;
 use App\Http\Controllers\Controller;
 use App\Models\Manuscript;
 use App\Models\ManuscriptReview;
+use App\Models\JournalCategory;
 use App\Models\JournalSetting;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -57,7 +58,9 @@ class ManuscriptController extends Controller
 
     public function create()
     {
-        return view('modules.journal.manuscripts.create');
+        $categories = JournalCategory::active()->ordered()->get();
+
+        return view('modules.journal.manuscripts.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -66,6 +69,7 @@ class ManuscriptController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:journal_categories,id'],
             // A draft can be saved without a file yet; pushing it into
             // the review workflow requires one.
             'manuscript_file' => ['required_if:action,submit', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
@@ -126,7 +130,9 @@ class ManuscriptController extends Controller
     {
         $this->authorizeAuthorEdit($manuscript);
 
-        return view('modules.journal.manuscripts.edit', compact('manuscript'));
+        $categories = JournalCategory::active()->ordered()->get();
+
+        return view('modules.journal.manuscripts.edit', compact('manuscript', 'categories'));
     }
 
     /**
@@ -148,6 +154,7 @@ class ManuscriptController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:journal_categories,id'],
             'manuscript_file' => [
                 $isDraft ? 'required_if:action,submit' : 'nullable',
                 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240',
@@ -176,6 +183,7 @@ class ManuscriptController extends Controller
                 'title' => $data['title'],
                 'abstract' => $data['abstract'],
                 'keywords' => $data['keywords'] ?? null,
+                'category_id' => $data['category_id'] ?? $manuscript->category_id,
                 'manuscript_file' => $data['manuscript_file'] ?? $manuscript->manuscript_file,
                 'status' => $isSubmit ? 'submitted' : 'draft',
                 'submitted_at' => $isSubmit ? now() : null,
@@ -201,6 +209,7 @@ class ManuscriptController extends Controller
                 'title' => $data['title'],
                 'abstract' => $data['abstract'],
                 'keywords' => $data['keywords'] ?? null,
+                'category_id' => $data['category_id'] ?? $manuscript->category_id,
                 'manuscript_file' => $data['manuscript_file'] ?? $manuscript->manuscript_file,
                 'status' => $newStatus,
                 'submitted_at' => now(),
