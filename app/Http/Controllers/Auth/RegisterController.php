@@ -67,10 +67,12 @@ class RegisterController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
+        $user->sendEmailVerificationNotification();
+
         $names = collect($joined)->pluck('name')->implode(', ');
 
         return redirect()
-            ->route('dashboard')
-            ->with('success', "Welcome! Your account is ready — you're enrolled in: {$names}.");
+            ->route('verification.notice')
+            ->with('success', "Welcome! You're enrolled in: {$names}. Verify your email to get started.");
     }
 }

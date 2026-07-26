@@ -3,13 +3,15 @@
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
-    use HasFactory, Notifiable, SoftDeletes;
+    use HasFactory, MustVerifyEmailTrait, Notifiable, SoftDeletes;
 
     protected $fillable = [
 
@@ -102,6 +104,20 @@ class User extends Authenticatable
         return trim(
             "{$this->first_name} {$this->middle_name} {$this->last_name}"
         );
+    }
+
+    /**
+     * Laravel's MustVerifyEmail trait only touches email_verified_at.
+     * This table also carries a separate email_verified boolean
+     * (used by admin listings/seeders) — keep both in sync so nothing
+     * that reads the boolean silently goes stale.
+     */
+    public function markEmailAsVerified(): bool
+    {
+        return $this->forceFill([
+            'email_verified_at' => $this->freshTimestamp(),
+            'email_verified' => true,
+        ])->save();
     }
 
     /*
