@@ -12,7 +12,11 @@
   <div class="main-content page-wiki-article-edit">
 
     <div class="mb-4">
-      <h1 class="h3 mb-1">Edit: <?php echo e($article->title); ?></h1>
+      <h1 class="h3 mb-1">
+        Edit: <?php echo e($article->title); ?>
+
+        <span class="badge <?php echo e($article->isDraft() ? 'bg-secondary' : 'bg-success'); ?>"><?php echo e($article->statusLabel()); ?></span>
+      </h1>
       <p class="text-muted mb-0">Saving creates a new revision — nothing is overwritten in the history.</p>
     </div>
 
@@ -79,8 +83,24 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a href="<?php echo e(route('wiki.articles.show', $article)); ?>" class="btn btn-outline-secondary">Cancel</a>
+        <?php if($canChangeStatus): ?>
+          <?php if($article->isDraft()): ?>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+              <i class="bi bi-file-earmark"></i> Save as Draft
+            </button>
+            <button type="submit" name="action" value="publish" class="btn btn-primary">
+              <i class="bi bi-send"></i> Publish
+            </button>
+          <?php else: ?>
+            <button type="submit" name="action" value="publish" class="btn btn-primary">Save Changes</button>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-return-left"></i> Unpublish to Draft
+            </button>
+          <?php endif; ?>
+        <?php else: ?>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        <?php endif; ?>
+        <a href="<?php echo e(route('wiki.articles.show', $article)); ?>" class="btn btn-outline-secondary ms-auto">Cancel</a>
       </div>
 
     </form>
