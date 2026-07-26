@@ -93,6 +93,65 @@ class Manuscript extends Model
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * The full submission-to-publishing pipeline, as steps for display
+     * (e.g. a progress stepper on the manuscript page). Each step comes
+     * back with a 'state':
+     *
+     *   - complete: already passed through this step
+     *   - current:  the manuscript is here right now (green)
+     *   - upcoming: hasn't reached this step yet (gray)
+     *   - warning:  paused here pending author action (amber)
+     *   - danger:   stopped here, rejected (red)
+     *
+     * 'desk_rejected', 'revision_requested', and 'rejected' aren't
+     * steps of their own — they're exception states layered onto the
+     * happy-path step they interrupted, so the stepper always shows
+     * one continuous line rather than a dead branch.
+     */
+    public function workflowSteps(): array
+    {
+        $steps = [
+            'draft' => 'Draft',
+            'submitted' => 'Submitted',
+            'screening' => 'Editorial Screening',
+            'under_review' => 'Peer Review',
+            'accepted' => 'Accepted',
+            'published' => 'Published',
+        ];
+
+        $order = array_keys($steps);
+
+        $exceptions = [
+            'desk_rejected' => ['at' => 'screening', 'state' => 'danger', 'label' => 'Desk Rejected'],
+            'revision_requested' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Revision Requested'],
+            'rejected' => ['at' => 'accepted', 'state' => 'danger', 'label' => 'Rejected'],
+        ];
+
+        $exception = $exceptions[$this->status] ?? null;
+        $effectiveKey = $exception['at'] ?? $this->status;
+        $currentIndex = array_search($effectiveKey, $order, true);
+
+        $result = [];
+
+        foreach ($order as $i => $key) {
+            if ($currentIndex === false || $i < $currentIndex) {
+                $state = 'complete';
+                $label = $steps[$key];
+            } elseif ($i === $currentIndex) {
+                $state = $exception['state'] ?? 'current';
+                $label = $exception['label'] ?? $steps[$key];
+            } else {
+                $state = 'upcoming';
+                $label = $steps[$key];
+            }
+
+            $result[] = ['key' => $key, 'label' => $label, 'state' => $state];
+        }
+
+        return $result;
+    }
+
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? $this->status;
