@@ -8,9 +8,14 @@
         <p class="text-muted mb-0">Browse, write, and help govern the Oromo Wikipedia.</p>
       </div>
       @if($canEdit)
-        <a href="{{ route('wiki.articles.create') }}" class="btn btn-primary">
-          <i class="bi bi-file-earmark-plus"></i> New Article
-        </a>
+        <div class="d-flex gap-2">
+          <a href="{{ route('wiki.articles.create') }}" class="btn btn-primary">
+            <i class="bi bi-file-earmark-plus"></i> New Article
+          </a>
+          <a href="{{ route('wiki.articles.edit-requests.index') }}" class="btn btn-outline-dark">
+            <i class="bi bi-inbox"></i> Edit Requests
+          </a>
+        </div>
       @endif
     </div>
 
@@ -62,6 +67,10 @@
       @if($canModerate)
         <a href="{{ route('wiki.blocks.index') }}" class="btn btn-outline-dark">
           <i class="bi bi-slash-circle"></i> User Blocks
+        </a>
+
+        <a href="{{ route('wiki.categories.index') }}" class="btn btn-outline-dark">
+          <i class="bi bi-tags"></i> Categories
         </a>
       @endif
 

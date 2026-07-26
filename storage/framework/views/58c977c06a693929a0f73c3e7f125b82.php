@@ -48,6 +48,26 @@
                    placeholder="Briefly describe this edit (optional)">
           </div>
 
+          <div class="col-12">
+            <label class="form-label">Categories</label>
+            <?php if($categories->isEmpty()): ?>
+              <p class="text-muted small mb-0">No categories configured yet.</p>
+            <?php else: ?>
+              <div class="row">
+                <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                  <div class="col-md-4 col-6">
+                    <div class="form-check">
+                      <input type="checkbox" name="category_ids[]" value="<?php echo e($category->id); ?>"
+                             class="form-check-input" id="category-<?php echo e($category->id); ?>"
+                             <?php echo e(in_array($category->id, old('category_ids', [])) ? 'checked' : ''); ?>>
+                      <label class="form-check-label" for="category-<?php echo e($category->id); ?>"><?php echo e($category->name); ?></label>
+                    </div>
+                  </div>
+                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+              </div>
+            <?php endif; ?>
+          </div>
+
         </div>
       </div>
 

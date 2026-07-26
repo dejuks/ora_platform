@@ -17,9 +17,14 @@
         <p class="text-muted mb-0">Browse, write, and help govern the Oromo Wikipedia.</p>
       </div>
       <?php if($canEdit): ?>
-        <a href="<?php echo e(route('wiki.articles.create')); ?>" class="btn btn-primary">
-          <i class="bi bi-file-earmark-plus"></i> New Article
-        </a>
+        <div class="d-flex gap-2">
+          <a href="<?php echo e(route('wiki.articles.create')); ?>" class="btn btn-primary">
+            <i class="bi bi-file-earmark-plus"></i> New Article
+          </a>
+          <a href="<?php echo e(route('wiki.articles.edit-requests.index')); ?>" class="btn btn-outline-dark">
+            <i class="bi bi-inbox"></i> Edit Requests
+          </a>
+        </div>
       <?php endif; ?>
     </div>
 
@@ -71,6 +76,10 @@
       <?php if($canModerate): ?>
         <a href="<?php echo e(route('wiki.blocks.index')); ?>" class="btn btn-outline-dark">
           <i class="bi bi-slash-circle"></i> User Blocks
+        </a>
+
+        <a href="<?php echo e(route('wiki.categories.index')); ?>" class="btn btn-outline-dark">
+          <i class="bi bi-tags"></i> Categories
         </a>
       <?php endif; ?>
 

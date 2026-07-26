@@ -36,6 +36,13 @@
           · Last edited by <?php echo e($article->lastEditedBy->full_name ?? '—'); ?>
 
         </p>
+        <?php if($article->categories->isNotEmpty()): ?>
+          <p class="mb-0 mt-1">
+            <?php $__currentLoopData = $article->categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <span class="badge bg-light text-dark border"><?php echo e($category->name); ?></span>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </p>
+        <?php endif; ?>
       </div>
       <a href="<?php echo e(route('wiki.articles.index')); ?>" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
@@ -45,6 +52,12 @@
     <?php if(session('success')): ?>
       <div class="alert alert-success"><?php echo e(session('success')); ?></div>
     <?php endif; ?>
+    <?php if(session('info')): ?>
+      <div class="alert alert-info"><?php echo e(session('info')); ?></div>
+    <?php endif; ?>
+    <?php if(session('error')): ?>
+      <div class="alert alert-danger"><?php echo e(session('error')); ?></div>
+    <?php endif; ?>
 
     <div class="row g-4">
 
@@ -53,7 +66,7 @@
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Content</strong>
-            <?php if($canEdit && ! $article->trashed()): ?>
+            <?php if($canEditThisArticle && ! $article->trashed()): ?>
               <a href="<?php echo e(route('wiki.articles.edit', $article)); ?>" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-pencil"></i> Edit
               </a>
@@ -63,6 +76,33 @@
             <div style="white-space: pre-wrap;"><?php echo e($article->content); ?></div>
           </div>
         </div>
+
+        
+        <?php if($canEdit && ! $isOwner && ! $canModerate && ! $canEditThisArticle && ! $article->trashed()): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Editing is owner-restricted</strong></div>
+            <div class="card-body">
+              <?php if($myPendingRequest): ?>
+                <p class="text-muted mb-0">
+                  <i class="bi bi-hourglass-split"></i> Your request to edit this article is waiting on the owner's decision.
+                </p>
+              <?php else: ?>
+                <p class="text-muted">Only the article's owner can edit it. Ask for one-time permission below.</p>
+                <form action="<?php echo e(route('wiki.articles.edit-requests.store', $article)); ?>" method="POST">
+                  <?php echo csrf_field(); ?>
+                  <div class="mb-3">
+                    <label class="form-label">Message to the owner (optional)</label>
+                    <textarea name="message" class="form-control" rows="2" maxlength="500"
+                              placeholder="Briefly say what you'd like to fix or add"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-send"></i> Request Edit Access
+                  </button>
+                </form>
+              <?php endif; ?>
+            </div>
+          </div>
+        <?php endif; ?>
 
         
         <?php if($canEdit && ! $article->trashed() && ! $openDiscussion): ?>
@@ -110,6 +150,37 @@
       <div class="col-lg-4">
 
         
+        <?php if(($isOwner || $canModerate) && $pendingRequestsToDecide->isNotEmpty()): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Pending Edit Requests</strong></div>
+            <div class="card-body">
+              <?php $__currentLoopData = $pendingRequestsToDecide; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $editRequest): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <div class="border-bottom pb-3 mb-3">
+                  <div class="fw-semibold"><?php echo e($editRequest->requester->full_name ?? 'Unknown'); ?></div>
+                  <?php if($editRequest->message): ?>
+                    <div class="text-muted small mb-2">"<?php echo e($editRequest->message); ?>"</div>
+                  <?php endif; ?>
+                  <div class="d-flex gap-2">
+                    <form action="<?php echo e(route('wiki.articles.edit-requests.approve', [$article, $editRequest])); ?>" method="POST">
+                      <?php echo csrf_field(); ?>
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-check-lg"></i> Approve
+                      </button>
+                    </form>
+                    <form action="<?php echo e(route('wiki.articles.edit-requests.reject', [$article, $editRequest])); ?>" method="POST">
+                      <?php echo csrf_field(); ?>
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-x-lg"></i> Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        
         <?php if($canModerate): ?>
           <div class="card mb-4">
             <div class="card-header"><strong>Moderation (Sysop)</strong></div>
@@ -144,6 +215,14 @@
                 </form>
               <?php endif; ?>
 
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
+              <a href="<?php echo e(route('wiki.categories.index')); ?>" class="btn btn-sm btn-outline-dark w-100">
+                <i class="bi bi-tags"></i> Manage Categories
+              </a>
             </div>
           </div>
         <?php endif; ?>

@@ -29,6 +29,14 @@
           <div class="col-md-4">
             <input type="text" name="q" class="form-control" placeholder="Search by title…" value="{{ request('q') }}">
           </div>
+          <div class="col-md-3">
+            <select name="category" class="form-select">
+              <option value="">All categories</option>
+              @foreach($categories as $category)
+                <option value="{{ $category->slug }}" @selected(request('category') === $category->slug)>{{ $category->name }}</option>
+              @endforeach
+            </select>
+          </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-outline-secondary">Search</button>
           </div>
@@ -45,6 +53,7 @@
                 <th>Title</th>
                 <th>Author</th>
                 <th>Last Edited By</th>
+                <th>Categories</th>
                 <th>Status</th>
                 <th>Protection</th>
                 <th class="text-end">Actions</th>
@@ -61,6 +70,13 @@
                   </td>
                   <td>{{ $article->author->full_name ?? '—' }}</td>
                   <td>{{ $article->lastEditedBy->full_name ?? '—' }}</td>
+                  <td>
+                    @forelse($article->categories as $category)
+                      <span class="badge bg-light text-dark border">{{ $category->name }}</span>
+                    @empty
+                      <span class="text-muted">—</span>
+                    @endforelse
+                  </td>
                   <td><span class="badge bg-secondary">{{ $article->statusLabel() }}</span></td>
                   <td>
                     @if($article->protection_level !== 'none')
@@ -77,7 +93,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No articles yet.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No articles yet.</td>
                 </tr>
               @endforelse
             </tbody>

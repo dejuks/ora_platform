@@ -38,6 +38,14 @@
           <div class="col-md-4">
             <input type="text" name="q" class="form-control" placeholder="Search by title…" value="<?php echo e(request('q')); ?>">
           </div>
+          <div class="col-md-3">
+            <select name="category" class="form-select">
+              <option value="">All categories</option>
+              <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                <option value="<?php echo e($category->slug); ?>" <?php if(request('category') === $category->slug): echo 'selected'; endif; ?>><?php echo e($category->name); ?></option>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+            </select>
+          </div>
           <div class="col-auto">
             <button type="submit" class="btn btn-outline-secondary">Search</button>
           </div>
@@ -54,6 +62,7 @@
                 <th>Title</th>
                 <th>Author</th>
                 <th>Last Edited By</th>
+                <th>Categories</th>
                 <th>Status</th>
                 <th>Protection</th>
                 <th class="text-end">Actions</th>
@@ -71,6 +80,13 @@
                   </td>
                   <td><?php echo e($article->author->full_name ?? '—'); ?></td>
                   <td><?php echo e($article->lastEditedBy->full_name ?? '—'); ?></td>
+                  <td>
+                    <?php $__empty_2 = true; $__currentLoopData = $article->categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_2 = false; ?>
+                      <span class="badge bg-light text-dark border"><?php echo e($category->name); ?></span>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_2): ?>
+                      <span class="text-muted">—</span>
+                    <?php endif; ?>
+                  </td>
                   <td><span class="badge bg-secondary"><?php echo e($article->statusLabel()); ?></span></td>
                   <td>
                     <?php if($article->protection_level !== 'none'): ?>
@@ -87,7 +103,7 @@
                 </tr>
               <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No articles yet.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No articles yet.</td>
                 </tr>
               <?php endif; ?>
             </tbody>
