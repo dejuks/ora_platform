@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\JournalPayment;
 use App\Models\JournalSetting;
 use App\Models\Manuscript;
+use App\Notifications\AppNotification;
 use App\Services\ChapaService;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +34,8 @@ use RuntimeException;
  */
 class PaymentController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function __construct(protected ChapaService $chapa)
     {
     }
@@ -193,6 +197,24 @@ class PaymentController extends Controller
             'payment_status' => 'paid',
             'fee_paid_at' => now(),
         ]);
+
+        $manuscript = $payment->manuscript;
+
+        $manuscript->author?->notify(new AppNotification(
+            title: 'Payment received',
+            message: "Your payment for \"{$manuscript->title}\" was received. It's now queued for publication.",
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-credit-card',
+            type: 'success',
+        ));
+
+        $this->notifyPermissionHolders('journal', 'manage-workflow', new AppNotification(
+            title: 'Ready to publish',
+            message: "\"{$manuscript->title}\" has a settled publication fee and is ready to be published.",
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-journal-check',
+            type: 'info',
+        ));
     }
 
     protected function authorizeOwner(Manuscript $manuscript): void

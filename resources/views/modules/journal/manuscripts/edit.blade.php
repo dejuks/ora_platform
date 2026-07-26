@@ -27,6 +27,12 @@
       </div>
     @endif
 
+    <div class="card mb-4">
+      <div class="card-body">
+        @include('modules.journal.manuscripts._workflow-steps')
+      </div>
+    </div>
+
     <form action="{{ route('journal.manuscripts.update', $manuscript) }}" method="POST" enctype="multipart/form-data">
       @csrf
       @method('PUT')
@@ -48,6 +54,19 @@
             <label class="form-label">Keywords</label>
             <input type="text" name="keywords" class="form-control" value="{{ old('keywords', $manuscript->keywords) }}"
                    placeholder="Comma-separated">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+              <option value="">— Select a category —</option>
+              @foreach($categories as $category)
+                <option value="{{ $category->id }}"
+                  {{ old('category_id', $manuscript->category_id) == $category->id ? 'selected' : '' }}>
+                  {{ $category->name }}
+                </option>
+              @endforeach
+            </select>
           </div>
 
           <div class="col-md-6">
