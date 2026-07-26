@@ -51,9 +51,11 @@ class RegisterController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
+        $user->sendEmailVerificationNotification();
+
         return redirect()
-            ->route('researcher.members.index')
-            ->with('success', 'Welcome to the Researchers\' Network! Complete your profile so other members can find you.');
+            ->route('verification.notice')
+            ->with('success', 'Welcome to the Researchers\' Network! Verify your email to get started.');
     }
 
     /**
