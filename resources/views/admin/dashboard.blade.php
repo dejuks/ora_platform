@@ -320,6 +320,10 @@
               <i class="bi bi-key"></i>
               <span>Permissions</span>
             </a>
+            <a href="{{ route('admin.settings.edit') }}" class="dashboard-action-item">
+              <i class="bi bi-gear"></i>
+              <span>Settings</span>
+            </a>
           </div>
         </section>
       </div>

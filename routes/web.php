@@ -6,6 +6,7 @@ use App\Http\Controllers\Account\SettingsController as AccountSettingsController
 use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SystemSettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -381,6 +382,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::resource('roles', RoleController::class);
 
             Route::resource('permissions', PermissionController::class);
+
+            Route::get('settings', [SystemSettingController::class, 'edit'])
+                ->name('settings.edit');
+
+            Route::put('settings', [SystemSettingController::class, 'update'])
+                ->name('settings.update');
         });
 
     /*
