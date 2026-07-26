@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Mews\Purifier\Facades\Purifier;
 
 /**
  * The real Journal Management workflow:
@@ -61,6 +62,11 @@ class ManuscriptController extends Controller
             'keywords' => ['nullable', 'string', 'max:255'],
             'manuscript_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
+
+        // CKEditor runs client-side only — this endpoint still accepts
+        // raw POST data, so sanitize server-side regardless of what
+        // was actually submitted through the editor.
+        $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
 
         $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
         $data['author_id'] = Auth::id();
@@ -121,6 +127,8 @@ class ManuscriptController extends Controller
             'keywords' => ['nullable', 'string', 'max:255'],
             'manuscript_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
         ]);
+
+        $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
 
         if ($request->hasFile('manuscript_file')) {
             if ($manuscript->manuscript_file) {

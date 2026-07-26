@@ -30,7 +30,7 @@
 
           <div class="col-12">
             <label class="form-label">Abstract *</label>
-            <textarea name="abstract" class="form-control" rows="6" required>{{ old('abstract') }}</textarea>
+            <textarea id="abstract" name="abstract" class="form-control" rows="6" required>{{ old('abstract') }}</textarea>
           </div>
 
           <div class="col-md-6">
@@ -55,5 +55,7 @@
     </form>
 
   </div>
+
+  @include('modules.journal.manuscripts._abstract-editor')
 
 </x-layout>
