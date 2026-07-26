@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\SidebarService;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Pagination\Paginator;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -29,5 +30,6 @@ class AppServiceProvider extends ServiceProvider
                 $view->with('headerUnreadCount', $user->unreadNotifications()->count());
             }
         });
+        Paginator::useBootstrapFive();
     }
 }
