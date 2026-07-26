@@ -15,6 +15,7 @@ class Manuscript extends Model
         'keywords',
         'author_id',
         'associate_editor_id',
+        'category_id',
         'status',
         'manuscript_file',
         'editor_decision_notes',
@@ -85,6 +86,11 @@ class Manuscript extends Model
     public function payments()
     {
         return $this->hasMany(JournalPayment::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(JournalCategory::class, 'category_id');
     }
 
     /*
@@ -214,5 +220,18 @@ class Manuscript extends Model
     public function scopePublished($query)
     {
         return $query->where('status', 'published');
+    }
+
+    public function scopeInCategory($query, string $categorySlug)
+    {
+        return $query->whereHas('category', fn ($q) => $q->where('slug', $categorySlug));
+    }
+
+    /**
+     * A-Z filter: titles starting with the given letter (case-insensitive).
+     */
+    public function scopeTitleStartsWith($query, string $letter)
+    {
+        return $query->where('title', 'like', $letter . '%');
     }
 }
