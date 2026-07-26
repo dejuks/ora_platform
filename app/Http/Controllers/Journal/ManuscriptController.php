@@ -41,8 +41,14 @@ class ManuscriptController extends Controller
         } elseif (! $this->isEditorial($user) && ! $user->isSuperAdmin()) {
             // Plain Author: only their own submissions.
             $query->where('author_id', $user->id);
+        } else {
+            // Journal Manager / EIC / Associate Editor / Super Admin see
+            // everything that's actually been pushed into the workflow —
+            // but not other people's drafts, which are private to the author.
+            $query->where(function ($q) use ($user) {
+                $q->where('status', '!=', 'draft')->orWhere('author_id', $user->id);
+            });
         }
-        // Journal Manager / EIC / Associate Editor / Super Admin see everything.
 
         $manuscripts = $query->paginate(15)->withQueryString();
 
@@ -60,7 +66,10 @@ class ManuscriptController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
-            'manuscript_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            // A draft can be saved without a file yet; pushing it into
+            // the review workflow requires one.
+            'manuscript_file' => ['required_if:action,submit', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'action' => ['required', 'in:draft,submit'],
         ]);
 
         // CKEditor runs client-side only — this endpoint still accepts
@@ -68,17 +77,29 @@ class ManuscriptController extends Controller
         // was actually submitted through the editor.
         $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
 
-        $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
+        $isSubmit = $data['action'] === 'submit';
+
+        if ($request->hasFile('manuscript_file')) {
+            $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
+        } else {
+            unset($data['manuscript_file']);
+        }
+
         $data['author_id'] = Auth::id();
-        $data['status'] = 'submitted';
-        $data['submitted_at'] = now();
+        $data['status'] = $isSubmit ? 'submitted' : 'draft';
+        $data['submitted_at'] = $isSubmit ? now() : null;
         $data['created_by'] = Auth::id();
+        unset($data['action']);
 
         $manuscript = Manuscript::create($data);
 
+        $message = $isSubmit
+            ? 'Manuscript submitted successfully.'
+            : 'Draft saved. Only you can see it until you push it for review.';
+
         return redirect()
             ->route('journal.manuscripts.show', $manuscript)
-            ->with('success', 'Manuscript submitted successfully.');
+            ->with('success', $message);
     }
 
     public function show(Manuscript $manuscript)
@@ -121,11 +142,17 @@ class ManuscriptController extends Controller
     {
         $this->authorizeAuthorEdit($manuscript);
 
+        $isDraft = $manuscript->status === 'draft';
+
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
-            'manuscript_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
+            'manuscript_file' => [
+                $isDraft ? 'required_if:action,submit' : 'nullable',
+                'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240',
+            ],
+            'action' => [$isDraft ? 'required' : 'nullable', 'in:draft,submit'],
         ]);
 
         $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
@@ -136,6 +163,32 @@ class ManuscriptController extends Controller
             }
 
             $data['manuscript_file'] = $request->file('manuscript_file')->store('manuscripts', 'public');
+        }
+
+        if ($isDraft) {
+            // A draft only ever moves between "still a draft" and
+            // "pushed into the review pipeline" — none of the
+            // resubmission/reviewer-reset logic below applies, since
+            // it has never been through screening or review yet.
+            $isSubmit = $data['action'] === 'submit';
+
+            $manuscript->update([
+                'title' => $data['title'],
+                'abstract' => $data['abstract'],
+                'keywords' => $data['keywords'] ?? null,
+                'manuscript_file' => $data['manuscript_file'] ?? $manuscript->manuscript_file,
+                'status' => $isSubmit ? 'submitted' : 'draft',
+                'submitted_at' => $isSubmit ? now() : null,
+                'updated_by' => Auth::id(),
+            ]);
+
+            $message = $isSubmit
+                ? 'Manuscript submitted successfully.'
+                : 'Draft saved. Only you can see it until you push it for review.';
+
+            return redirect()
+                ->route('journal.manuscripts.show', $manuscript)
+                ->with('success', $message);
         }
 
         DB::transaction(function () use ($manuscript, $data) {
@@ -391,11 +444,18 @@ class ManuscriptController extends Controller
     {
         $user = Auth::user();
 
-        if ($user->isSuperAdmin() || $this->isEditorial($user)) {
+        if ($manuscript->author_id === $user->id) {
             return;
         }
 
-        if ($manuscript->author_id === $user->id) {
+        // A draft is only visible to its author, full stop — it hasn't
+        // been pushed into the workflow yet, so no editorial role or
+        // reviewer has any reason to see it.
+        if ($manuscript->status === 'draft') {
+            abort(404);
+        }
+
+        if ($user->isSuperAdmin() || $this->isEditorial($user)) {
             return;
         }
 

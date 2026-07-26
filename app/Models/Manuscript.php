@@ -45,6 +45,7 @@ class Manuscript extends Model
      * Every status a manuscript can be in, in workflow order.
      */
     public const STATUSES = [
+        'draft' => 'Draft',
         'submitted' => 'Submitted',
         'screening' => 'Editorial Screening',
         'desk_rejected' => 'Desk Rejected',
@@ -102,7 +103,7 @@ class Manuscript extends Model
      * workflow "paused" waiting on the author, and the author is
      * allowed to edit their content and push it back into play.
      */
-    public const REVISABLE_STATUSES = ['submitted', 'desk_rejected', 'revision_requested', 'rejected'];
+    public const REVISABLE_STATUSES = ['draft', 'submitted', 'desk_rejected', 'revision_requested', 'rejected'];
 
     public function isEditable(): bool
     {

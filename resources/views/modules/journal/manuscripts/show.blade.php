@@ -48,9 +48,25 @@
           </div>
         </div>
 
+        {{-- AUTHOR: still a draft — plain continue-editing prompt, not an
+             "action needed" warning like the resubmission cases below. --}}
+        @if($manuscript->author_id === $user->id && $manuscript->status === 'draft')
+          <div class="card mb-4">
+            <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div>
+                <strong>This is a draft.</strong>
+                <span class="text-muted">Only you can see it until you push it for review.</span>
+              </div>
+              <a href="{{ route('journal.manuscripts.edit', $manuscript) }}" class="btn btn-primary">
+                <i class="bi bi-pencil-square"></i> Continue Editing
+              </a>
+            </div>
+          </div>
+        @endif
+
         {{-- AUTHOR: Revise & Resubmit — the workflow "pauses" at desk_rejected,
              revision_requested, and rejected until the author does this. --}}
-        @if($manuscript->author_id === $user->id && $manuscript->isEditable() && $manuscript->status !== 'submitted')
+        @if($manuscript->author_id === $user->id && $manuscript->isEditable() && ! in_array($manuscript->status, ['submitted', 'draft']))
           <div class="card mb-4 border-warning">
             <div class="card-header bg-warning-subtle"><strong>Action Needed: Revise &amp; Resubmit</strong></div>
             <div class="card-body">
