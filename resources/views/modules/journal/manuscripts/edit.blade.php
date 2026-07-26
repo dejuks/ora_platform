@@ -3,7 +3,7 @@
   <div class="main-content page-manuscripts-edit">
 
     <div class="mb-4">
-      <h1 class="h3 mb-1">Revise &amp; Resubmit</h1>
+      <h1 class="h3 mb-1">{{ $manuscript->status === 'draft' ? 'Edit Draft' : 'Revise & Resubmit' }}</h1>
       <p class="text-muted mb-0">
         Current status:
         <span class="badge bg-secondary">{{ $manuscript->statusLabel() }}</span>
@@ -60,6 +60,8 @@
                   view current file
                 </a>
               </div>
+            @elseif($manuscript->status === 'draft')
+              <small class="text-muted">Not required to save the draft — required before you push it for review.</small>
             @endif
           </div>
 
@@ -67,7 +69,16 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Resubmit Manuscript</button>
+        @if($manuscript->status === 'draft')
+          <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+            <i class="bi bi-file-earmark"></i> Save as Draft
+          </button>
+          <button type="submit" name="action" value="submit" class="btn btn-primary">
+            <i class="bi bi-send"></i> Push for Review
+          </button>
+        @else
+          <button type="submit" class="btn btn-primary">Resubmit Manuscript</button>
+        @endif
         <a href="{{ route('journal.manuscripts.show', $manuscript) }}" class="btn btn-outline-secondary">Cancel</a>
       </div>
 
