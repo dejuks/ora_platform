@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             PermissionSeeder::class,
             RoleSeeder::class,
             RoleDemoUserSeeder::class,
+            WikiCategorySeeder::class,
         ]);
 
         // Give the "familiar" seeded normal user (johndoe / user@example.com)

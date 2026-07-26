@@ -330,11 +330,20 @@
 
 {{-- Top identity bar --}}
 <div class="ow-topbar">
-    <div class="container d-flex justify-content-end ow-topbar-links">
-        <a href="{{ route('login') }}">Log in</a>
-        @if (Route::has('register'))
-            <a href="{{ route('register') }}">Create account</a>
-        @endif
+    <div class="container d-flex justify-content-end align-items-center ow-topbar-links">
+        @auth
+            <span>{{ Auth::user()->full_name ?? Auth::user()->name }}</span>
+            <a href="{{ route('dashboard') }}">Dashboard</a>
+            <form action="{{ route('logout') }}" method="POST" class="d-inline m-0">
+                @csrf
+                <button type="submit" class="btn btn-link p-0 m-0 align-baseline" style="margin-left:16px; border:none; background:none; color:inherit; text-decoration:none; font-size:inherit;">Log out</button>
+            </form>
+        @else
+            <a href="{{ route('login') }}">Log in</a>
+            @if (Route::has('register'))
+                <a href="{{ route('register') }}">Create account</a>
+            @endif
+        @endauth
     </div>
 </div>
 
@@ -381,7 +390,14 @@
 
             <h6>Contribute</h6>
             <ul>
-                <li><a href="{{ route('login') }}">Sign in to edit</a></li>
+                @auth
+                    @if (Auth::user()->hasModulePermission('wiki', 'edit-articles'))
+                        <li><a href="{{ route('wiki.articles.create') }}">Write a new article</a></li>
+                    @endif
+                    <li><a href="{{ route('dashboard') }}">Go to Dashboard</a></li>
+                @else
+                    <li><a href="{{ route('login') }}">Sign in to edit</a></li>
+                @endauth
                 <li><a href="{{ route('wiki.public.about') }}#contributor-guidelines">Contributor guidelines</a></li>
             </ul>
         </aside>
@@ -399,7 +415,11 @@
         <div class="ow-footer-links">
             <a href="{{ route('wiki.public.about') }}">About</a>
             <a href="{{ route('portal') }}#contact">Contact us</a>
-            <a href="{{ route('login') }}">Sign in</a>
+            @auth
+                <a href="{{ route('dashboard') }}">Dashboard</a>
+            @else
+                <a href="{{ route('login') }}">Sign in</a>
+            @endauth
         </div>
     </div>
 </div>

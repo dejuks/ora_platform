@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'module.access' => \App\Http\Middleware\EnsureModuleAccess::class,
             'module.admin' => \App\Http\Middleware\EnsureModuleAdmin::class,
             'module.permission' => \App\Http\Middleware\EnsureModulePermission::class,
+            'wiki.not_blocked' => \App\Http\Middleware\EnsureNotWikiBlocked::class,
         ]);
 
         // Chapa calls these routes server-to-server with no session and

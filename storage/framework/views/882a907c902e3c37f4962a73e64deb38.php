@@ -12,6 +12,20 @@
     </h1>
     <p class="ow-page-sub">From Oromo Wikipedia, the free encyclopedia</p>
 
+    <?php if($categories->isNotEmpty()): ?>
+        <div class="ow-categories-strip mb-3">
+            <strong>Categories:</strong>
+            <a href="<?php echo e(route('wiki.public.index')); ?>" class="<?php echo e(request('category') ? '' : 'fw-bold'); ?>">All</a>
+            <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                ·
+                <a href="<?php echo e(route('wiki.public.category', $category)); ?>"
+                   class="<?php echo e(request('category') === $category->slug ? 'fw-bold' : ''); ?>">
+                    <?php echo e($category->name); ?> (<?php echo e($category->articles_count); ?>)
+                </a>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+        </div>
+    <?php endif; ?>
+
     <div class="ow-content-grid">
         <div class="ow-results-col">
 
@@ -34,6 +48,12 @@
                         <div class="ow-result-meta">
                             Last edited <?php echo e(optional($article->published_at)->format('d F Y')); ?>
 
+                            <?php if($article->categories->isNotEmpty()): ?>
+                                ·
+                                <?php $__currentLoopData = $article->categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                    <a href="<?php echo e(route('wiki.public.category', $category)); ?>"><?php echo e($category->name); ?></a><?php if(!$loop->last): ?>,<?php endif; ?>
+                                <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                            <?php endif; ?>
                         </div>
                         <p class="ow-result-snippet">
                             <?php echo e(\Illuminate\Support\Str::limit(strip_tags($article->content), 220)); ?>

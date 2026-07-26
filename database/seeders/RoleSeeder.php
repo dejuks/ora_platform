@@ -178,14 +178,14 @@ class RoleSeeder extends Seeder
                 'slug' => 'bureaucrat',
                 'description' => 'Promotes or demotes local administrators, renames user accounts globally, oversees governance policies.',
                 'is_admin_role' => true,
-                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-wiki-governance'],
+                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-wiki-governance', 'manage-categories'],
             ],
             [
                 'name' => 'Administrator (Sysop)',
                 'slug' => 'sysop',
                 'description' => 'Deletes/restores pages, blocks vandals and disruptive IPs, protects sensitive pages, closes deletion discussions.',
                 'is_admin_role' => false,
-                'permissions' => ['moderate-content'],
+                'permissions' => ['moderate-content', 'manage-categories'],
             ],
             [
                 'name' => 'Oversighter / CheckUser',

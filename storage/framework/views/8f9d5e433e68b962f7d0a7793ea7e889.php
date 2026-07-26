@@ -29,11 +29,11 @@
         <div class="ow-results-col">
             <div class="ow-article-body" style="white-space: pre-wrap;"><?php echo e($article->content); ?></div>
 
-            <?php if(isset($article->categories) && count($article->categories)): ?>
+            <?php if($article->categories->isNotEmpty()): ?>
                 <div class="ow-categories-strip">
                     <strong>Categories:</strong>
                     <?php $__currentLoopData = $article->categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <a href="#"><?php echo e($category); ?></a><?php if(!$loop->last): ?> ·<?php endif; ?>
+                        <a href="<?php echo e(route('wiki.public.category', $category)); ?>"><?php echo e($category->name); ?></a><?php if(!$loop->last): ?> ·<?php endif; ?>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </div>
             <?php endif; ?>

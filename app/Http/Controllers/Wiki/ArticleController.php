@@ -25,7 +25,7 @@ class ArticleController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Article::with(['author', 'lastEditedBy'])
+        $query = Article::with(['author', 'lastEditedBy', 'categories'])
             ->withTrashed()
             ->latest('updated_at');
 
@@ -33,16 +33,23 @@ class ArticleController extends Controller
             $query->where('title', 'like', "%{$search}%");
         }
 
-        $articles = $query->paginate(15)->withQueryString();
+        if ($categorySlug = $request->query('category')) {
+            $query->inCategory($categorySlug);
+        }
 
-        return view('modules.wiki.articles.index', compact('articles'));
+        $articles = $query->paginate(15)->withQueryString();
+        $categories = \App\Models\WikiCategory::active()->ordered()->get();
+
+        return view('modules.wiki.articles.index', compact('articles', 'categories'));
     }
 
     public function create()
     {
         $this->authorizePermission('edit-articles');
 
-        return view('modules.wiki.articles.create');
+        $categories = \App\Models\WikiCategory::active()->ordered()->get();
+
+        return view('modules.wiki.articles.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -53,6 +60,8 @@ class ArticleController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
             'edit_summary' => ['nullable', 'string', 'max:255'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:wiki_categories,id'],
         ]);
 
         $article = DB::transaction(function () use ($data, $request) {
@@ -69,6 +78,8 @@ class ArticleController extends Controller
                 'updated_by' => Auth::id(),
             ]);
 
+            $article->categories()->sync($data['category_ids'] ?? []);
+
             $this->recordRevision($article, $data['content'], $data['edit_summary'] ?? 'Created the article.', $request);
 
             return $article;
@@ -81,7 +92,7 @@ class ArticleController extends Controller
 
     public function show(Article $article)
     {
-        $article = Article::withTrashed()->with(['author', 'lastEditedBy', 'protectedBy'])->findOrFail($article->id);
+        $article = Article::withTrashed()->with(['author', 'lastEditedBy', 'protectedBy', 'categories'])->findOrFail($article->id);
 
         $article->load(['revisions' => function ($q) {
             $q->where('is_suppressed', false)->with('editor');
@@ -89,14 +100,37 @@ class ArticleController extends Controller
 
         $openDiscussion = $article->openDeletionDiscussion()->with(['openedBy', 'comments.user'])->first();
 
-        return view('modules.wiki.articles.show', compact('article', 'openDiscussion'));
+        $user = Auth::user();
+        $isOwner = $article->author_id === $user->id;
+        $canModerate = $user->hasModulePermission('wiki', 'moderate-content');
+        $myConsumableRequest = $article->consumableEditRequestFor($user);
+        $myPendingRequest = $article->pendingEditRequestFor($user);
+        $canEditThisArticle = $canModerate
+            || (! $article->isFullyProtected() && ($isOwner || $myConsumableRequest !== null));
+
+        $pendingRequestsToDecide = ($isOwner || $canModerate)
+            ? $article->editRequests()->pending()->with('requester')->latest()->get()
+            : collect();
+
+        return view('modules.wiki.articles.show', compact(
+            'article',
+            'openDiscussion',
+            'isOwner',
+            'canEditThisArticle',
+            'myConsumableRequest',
+            'myPendingRequest',
+            'pendingRequestsToDecide'
+        ));
     }
 
     public function edit(Article $article)
     {
         $this->authorizeEdit($article);
 
-        return view('modules.wiki.articles.edit', compact('article'));
+        $categories = \App\Models\WikiCategory::active()->ordered()->get();
+        $selectedCategoryIds = $article->categories()->pluck('wiki_categories.id')->all();
+
+        return view('modules.wiki.articles.edit', compact('article', 'categories', 'selectedCategoryIds'));
     }
 
     public function update(Request $request, Article $article)
@@ -107,6 +141,8 @@ class ArticleController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'content' => ['required', 'string'],
             'edit_summary' => ['nullable', 'string', 'max:255'],
+            'category_ids' => ['nullable', 'array'],
+            'category_ids.*' => ['integer', 'exists:wiki_categories,id'],
         ]);
 
         DB::transaction(function () use ($data, $article, $request) {
@@ -117,6 +153,10 @@ class ArticleController extends Controller
                 'last_edited_by' => Auth::id(),
                 'updated_by' => Auth::id(),
             ]);
+
+            $article->categories()->sync($data['category_ids'] ?? []);
+
+            $this->consumeEditRequestIfApplicable($article, Auth::user());
 
             $this->recordRevision($article, $data['content'], $data['edit_summary'] ?? 'Edited the article.', $request, $data['title']);
         });
@@ -221,9 +261,11 @@ class ArticleController extends Controller
     }
 
     /**
-     * Anyone with edit-articles can edit — unless the page is
-     * protected, in which case only the Sysop (moderate-content)
-     * or above may touch it.
+     * Editing model: the article's owner (author) and any
+     * Sysop/Bureaucrat (moderate-content) can always edit. Anyone
+     * else needs an owner-approved, not-yet-used edit request —
+     * see ArticleEditRequestController. Page protection still beats
+     * everyone except moderate-content, same as before.
      */
     protected function authorizeEdit(Article $article): void
     {
@@ -231,8 +273,40 @@ class ArticleController extends Controller
 
         abort_unless($user->hasModulePermission('wiki', 'edit-articles'), 403, 'You do not have permission to edit articles.');
 
-        if ($article->isFullyProtected()) {
-            abort_unless($user->hasModulePermission('wiki', 'moderate-content'), 403, 'This page is fully protected. Only an Administrator can edit it.');
+        if ($user->hasModulePermission('wiki', 'moderate-content')) {
+            return;
         }
+
+        if ($article->isFullyProtected()) {
+            abort(403, 'This page is fully protected. Only an Administrator can edit it.');
+        }
+
+        if ($article->author_id === $user->id) {
+            return;
+        }
+
+        abort_unless(
+            $article->consumableEditRequestFor($user) !== null,
+            403,
+            'You need the owner\'s approval before editing this article. Request edit access from the article page.'
+        );
+    }
+
+    /**
+     * If this save is happening on someone else's article via an
+     * approved request (not ownership, not admin override), spend
+     * that one-time approval now so they need to ask again next time.
+     */
+    protected function consumeEditRequestIfApplicable(Article $article, $user): void
+    {
+        if ($user->hasModulePermission('wiki', 'moderate-content')) {
+            return;
+        }
+
+        if ($article->author_id === $user->id) {
+            return;
+        }
+
+        $article->consumableEditRequestFor($user)?->markUsed();
     }
 }

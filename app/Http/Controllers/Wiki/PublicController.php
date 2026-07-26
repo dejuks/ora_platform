@@ -35,20 +35,45 @@ class PublicController extends Controller
 
     public function index(Request $request)
     {
-        $query = Article::published()->latest('updated_at');
+        $query = Article::published()->with('categories')->latest('updated_at');
 
         if ($search = $request->query('q')) {
             $query->where('title', 'like', "%{$search}%");
         }
 
-        $articles = $query->paginate(15)->withQueryString();
+        if ($categorySlug = $request->query('category')) {
+            $query->inCategory($categorySlug);
+        }
 
-        return view('modules.wiki.public.index', compact('articles'));
+        $articles = $query->paginate(15)->withQueryString();
+        $categories = \App\Models\WikiCategory::active()->ordered()->withCount([
+            'articles' => fn ($q) => $q->published(),
+        ])->get();
+
+        return view('modules.wiki.public.index', compact('articles', 'categories'));
+    }
+
+    public function category(\App\Models\WikiCategory $category)
+    {
+        abort_unless($category->is_active, 404);
+
+        $articles = $category->articles()
+            ->published()
+            ->latest('updated_at')
+            ->paginate(15);
+
+        $categories = \App\Models\WikiCategory::active()->ordered()->withCount([
+            'articles' => fn ($q) => $q->published(),
+        ])->get();
+
+        return view('modules.wiki.public.category', compact('category', 'articles', 'categories'));
     }
 
     public function show(Article $article)
     {
         abort_unless($article->status === 'published', 404);
+
+        $article->load('categories');
 
         return view('modules.wiki.public.show', compact('article'));
     }

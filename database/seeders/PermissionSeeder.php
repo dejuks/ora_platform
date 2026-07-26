@@ -59,6 +59,7 @@ class PermissionSeeder extends Seeder
             // Oromo Wikipedia
             ['slug' => 'edit-articles', 'name' => 'Edit Articles', 'description' => 'Create and edit wiki articles and upload free-license media.'],
             ['slug' => 'moderate-content', 'name' => 'Moderate Content', 'description' => 'Delete/restore pages, block disruptive users, protect sensitive pages.'],
+            ['slug' => 'manage-categories', 'name' => 'Manage Categories', 'description' => 'Create, edit, enable/disable, and remove wiki article categories.'],
             ['slug' => 'manage-wiki-governance', 'name' => 'Manage Wiki Governance', 'description' => 'Promote/demote administrators, rename accounts, oversee governance policy.'],
             ['slug' => 'suppress-revisions', 'name' => 'Suppress Revisions', 'description' => 'Suppress revisions containing private data and view IPs in abuse cases.'],
 

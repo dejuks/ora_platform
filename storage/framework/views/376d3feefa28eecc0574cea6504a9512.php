@@ -330,10 +330,19 @@
 
 
 <div class="ow-topbar">
-    <div class="container d-flex justify-content-end ow-topbar-links">
-        <a href="<?php echo e(route('login')); ?>">Log in</a>
-        <?php if(Route::has('register')): ?>
-            <a href="<?php echo e(route('register')); ?>">Create account</a>
+    <div class="container d-flex justify-content-end align-items-center ow-topbar-links">
+        <?php if(auth()->guard()->check()): ?>
+            <span><?php echo e(Auth::user()->full_name ?? Auth::user()->name); ?></span>
+            <a href="<?php echo e(route('dashboard')); ?>">Dashboard</a>
+            <form action="<?php echo e(route('logout')); ?>" method="POST" class="d-inline m-0">
+                <?php echo csrf_field(); ?>
+                <button type="submit" class="btn btn-link p-0 m-0 align-baseline" style="margin-left:16px; border:none; background:none; color:inherit; text-decoration:none; font-size:inherit;">Log out</button>
+            </form>
+        <?php else: ?>
+            <a href="<?php echo e(route('login')); ?>">Log in</a>
+            <?php if(Route::has('register')): ?>
+                <a href="<?php echo e(route('register')); ?>">Create account</a>
+            <?php endif; ?>
         <?php endif; ?>
     </div>
 </div>
@@ -381,7 +390,14 @@
 
             <h6>Contribute</h6>
             <ul>
-                <li><a href="<?php echo e(route('login')); ?>">Sign in to edit</a></li>
+                <?php if(auth()->guard()->check()): ?>
+                    <?php if(Auth::user()->hasModulePermission('wiki', 'edit-articles')): ?>
+                        <li><a href="<?php echo e(route('wiki.articles.create')); ?>">Write a new article</a></li>
+                    <?php endif; ?>
+                    <li><a href="<?php echo e(route('dashboard')); ?>">Go to Dashboard</a></li>
+                <?php else: ?>
+                    <li><a href="<?php echo e(route('login')); ?>">Sign in to edit</a></li>
+                <?php endif; ?>
                 <li><a href="<?php echo e(route('wiki.public.about')); ?>#contributor-guidelines">Contributor guidelines</a></li>
             </ul>
         </aside>
@@ -399,7 +415,11 @@
         <div class="ow-footer-links">
             <a href="<?php echo e(route('wiki.public.about')); ?>">About</a>
             <a href="<?php echo e(route('portal')); ?>#contact">Contact us</a>
-            <a href="<?php echo e(route('login')); ?>">Sign in</a>
+            <?php if(auth()->guard()->check()): ?>
+                <a href="<?php echo e(route('dashboard')); ?>">Dashboard</a>
+            <?php else: ?>
+                <a href="<?php echo e(route('login')); ?>">Sign in</a>
+            <?php endif; ?>
         </div>
     </div>
 </div>

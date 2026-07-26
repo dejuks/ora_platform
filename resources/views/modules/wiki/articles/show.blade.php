@@ -24,6 +24,13 @@
           · By {{ $article->author->full_name ?? '—' }}
           · Last edited by {{ $article->lastEditedBy->full_name ?? '—' }}
         </p>
+        @if($article->categories->isNotEmpty())
+          <p class="mb-0 mt-1">
+            @foreach($article->categories as $category)
+              <span class="badge bg-light text-dark border">{{ $category->name }}</span>
+            @endforeach
+          </p>
+        @endif
       </div>
       <a href="{{ route('wiki.articles.index') }}" class="btn btn-outline-secondary">
         <i class="bi bi-arrow-left"></i> Back
@@ -33,6 +40,12 @@
     @if(session('success'))
       <div class="alert alert-success">{{ session('success') }}</div>
     @endif
+    @if(session('info'))
+      <div class="alert alert-info">{{ session('info') }}</div>
+    @endif
+    @if(session('error'))
+      <div class="alert alert-danger">{{ session('error') }}</div>
+    @endif
 
     <div class="row g-4">
 
@@ -41,7 +54,7 @@
         <div class="card mb-4">
           <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Content</strong>
-            @if($canEdit && ! $article->trashed())
+            @if($canEditThisArticle && ! $article->trashed())
               <a href="{{ route('wiki.articles.edit', $article) }}" class="btn btn-sm btn-outline-primary">
                 <i class="bi bi-pencil"></i> Edit
               </a>
@@ -51,6 +64,35 @@
             <div style="white-space: pre-wrap;">{{ $article->content }}</div>
           </div>
         </div>
+
+        {{-- Owner-approval editing: anyone with edit-articles who isn't
+             the owner/admin, and doesn't already hold an unused approval,
+             has to ask the owner before they can touch this article. --}}
+        @if($canEdit && ! $isOwner && ! $canModerate && ! $canEditThisArticle && ! $article->trashed())
+          <div class="card mb-4">
+            <div class="card-header"><strong>Editing is owner-restricted</strong></div>
+            <div class="card-body">
+              @if($myPendingRequest)
+                <p class="text-muted mb-0">
+                  <i class="bi bi-hourglass-split"></i> Your request to edit this article is waiting on the owner's decision.
+                </p>
+              @else
+                <p class="text-muted">Only the article's owner can edit it. Ask for one-time permission below.</p>
+                <form action="{{ route('wiki.articles.edit-requests.store', $article) }}" method="POST">
+                  @csrf
+                  <div class="mb-3">
+                    <label class="form-label">Message to the owner (optional)</label>
+                    <textarea name="message" class="form-control" rows="2" maxlength="500"
+                              placeholder="Briefly say what you'd like to fix or add"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-outline-primary">
+                    <i class="bi bi-send"></i> Request Edit Access
+                  </button>
+                </form>
+              @endif
+            </div>
+          </div>
+        @endif
 
         {{-- REGISTERED EDITOR: open a deletion discussion (AfD) --}}
         @if($canEdit && ! $article->trashed() && ! $openDiscussion)
@@ -97,6 +139,38 @@
 
       <div class="col-lg-4">
 
+        {{-- Owner (or Sysop/Bureaucrat standing in) decides pending
+             requests to edit this specific article. --}}
+        @if(($isOwner || $canModerate) && $pendingRequestsToDecide->isNotEmpty())
+          <div class="card mb-4">
+            <div class="card-header"><strong>Pending Edit Requests</strong></div>
+            <div class="card-body">
+              @foreach($pendingRequestsToDecide as $editRequest)
+                <div class="border-bottom pb-3 mb-3">
+                  <div class="fw-semibold">{{ $editRequest->requester->full_name ?? 'Unknown' }}</div>
+                  @if($editRequest->message)
+                    <div class="text-muted small mb-2">"{{ $editRequest->message }}"</div>
+                  @endif
+                  <div class="d-flex gap-2">
+                    <form action="{{ route('wiki.articles.edit-requests.approve', [$article, $editRequest]) }}" method="POST">
+                      @csrf
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-check-lg"></i> Approve
+                      </button>
+                    </form>
+                    <form action="{{ route('wiki.articles.edit-requests.reject', [$article, $editRequest]) }}" method="POST">
+                      @csrf
+                      <button type="submit" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-x-lg"></i> Reject
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              @endforeach
+            </div>
+          </div>
+        @endif
+
         {{-- ADMINISTRATOR (SYSOP): protection / delete / restore --}}
         @if($canModerate)
           <div class="card mb-4">
@@ -132,6 +206,14 @@
                 </form>
               @endif
 
+            </div>
+          </div>
+
+          <div class="card mb-4">
+            <div class="card-body">
+              <a href="{{ route('wiki.categories.index') }}" class="btn btn-sm btn-outline-dark w-100">
+                <i class="bi bi-tags"></i> Manage Categories
+              </a>
             </div>
           </div>
         @endif

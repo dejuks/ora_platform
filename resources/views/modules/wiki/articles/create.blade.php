@@ -39,6 +39,26 @@
                    placeholder="Briefly describe this edit (optional)">
           </div>
 
+          <div class="col-12">
+            <label class="form-label">Categories</label>
+            @if($categories->isEmpty())
+              <p class="text-muted small mb-0">No categories configured yet.</p>
+            @else
+              <div class="row">
+                @foreach($categories as $category)
+                  <div class="col-md-4 col-6">
+                    <div class="form-check">
+                      <input type="checkbox" name="category_ids[]" value="{{ $category->id }}"
+                             class="form-check-input" id="category-{{ $category->id }}"
+                             {{ in_array($category->id, old('category_ids', [])) ? 'checked' : '' }}>
+                      <label class="form-check-label" for="category-{{ $category->id }}">{{ $category->name }}</label>
+                    </div>
+                  </div>
+                @endforeach
+              </div>
+            @endif
+          </div>
+
         </div>
       </div>
 

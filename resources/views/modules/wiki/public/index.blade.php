@@ -14,6 +14,20 @@
     </h1>
     <p class="ow-page-sub">From Oromo Wikipedia, the free encyclopedia</p>
 
+    @if($categories->isNotEmpty())
+        <div class="ow-categories-strip mb-3">
+            <strong>Categories:</strong>
+            <a href="{{ route('wiki.public.index') }}" class="{{ request('category') ? '' : 'fw-bold' }}">All</a>
+            @foreach($categories as $category)
+                ·
+                <a href="{{ route('wiki.public.category', $category) }}"
+                   class="{{ request('category') === $category->slug ? 'fw-bold' : '' }}">
+                    {{ $category->name }} ({{ $category->articles_count }})
+                </a>
+            @endforeach
+        </div>
+    @endif
+
     <div class="ow-content-grid">
         <div class="ow-results-col">
 
@@ -34,6 +48,12 @@
                         </a>
                         <div class="ow-result-meta">
                             Last edited {{ optional($article->published_at)->format('d F Y') }}
+                            @if($article->categories->isNotEmpty())
+                                ·
+                                @foreach($article->categories as $category)
+                                    <a href="{{ route('wiki.public.category', $category) }}">{{ $category->name }}</a>@if(!$loop->last),@endif
+                                @endforeach
+                            @endif
                         </div>
                         <p class="ow-result-snippet">
                             {{ \Illuminate\Support\Str::limit(strip_tags($article->content), 220) }}

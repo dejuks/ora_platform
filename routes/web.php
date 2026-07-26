@@ -50,7 +50,9 @@ use App\Http\Controllers\Researcher\ProfileController as ResearcherProfileContro
 use App\Http\Controllers\Researcher\RegisterController as ResearcherRegisterController;
 use App\Http\Controllers\Researcher\UserController as ResearcherUserController;
 use App\Http\Controllers\Wiki\ArticleController as WikiArticleController;
+use App\Http\Controllers\Wiki\ArticleEditRequestController as WikiArticleEditRequestController;
 use App\Http\Controllers\Wiki\BlockController as WikiBlockController;
+use App\Http\Controllers\Wiki\CategoryController as WikiCategoryController;
 use App\Http\Controllers\Wiki\DashboardController as WikiDashboardController;
 use App\Http\Controllers\Wiki\DeletionDiscussionController as WikiDeletionDiscussionController;
 use App\Http\Controllers\Wiki\PublicController as WikiPublicController;
@@ -96,6 +98,11 @@ Route::prefix('wiki/articles')
         Route::get('/', [WikiPublicController::class, 'index'])->name('index');
 
         Route::get('/random', [WikiPublicController::class, 'random'])->name('random');
+
+        // Literal path before the wildcard article show route below,
+        // same reasoning as the manage/articles group — otherwise
+        // 'category' would be swallowed as an article slug.
+        Route::get('/category/{category:slug}', [WikiPublicController::class, 'category'])->name('category');
 
         Route::get('/{article}', [WikiPublicController::class, 'show'])->name('show');
     });
@@ -497,22 +504,54 @@ Route::middleware('auth')->group(function () {
                 ->group(function () {
 
                     Route::get('/', [WikiArticleController::class, 'index'])->name('index');
-                    Route::get('create', [WikiArticleController::class, 'create'])->name('create');
-                    Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+
+                    // Literal 'edit-requests' must come before the '{article}'
+                    // wildcard show route below for the same reason 'create'
+                    // does — otherwise it gets swallowed as an article ID.
+                    Route::get('edit-requests', [WikiArticleEditRequestController::class, 'index'])
+                        ->name('edit-requests.index');
+
+                    // A blocked user/IP can still browse the wiki (same as
+                    // Wikipedia) but every action that creates, edits, or
+                    // otherwise changes content is gated behind an active-
+                    // block check.
+                    //
+                    // NOTE: literal segments ('create') must be registered
+                    // before the wildcard '{article}' routes below, or
+                    // Laravel matches '{article}' first and tries to
+                    // route-model-bind the literal string "create" as an
+                    // article ID.
+                    Route::middleware('wiki.not_blocked')->group(function () {
+                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
+                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
+                    });
+
                     Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
-                    Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
-                    Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 
-                    // Administrator (Sysop) — the protect/restore forms
-                    // submit plain POST (no @method spoofing), hence POST here.
-                    Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
-                    Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
-                    Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
-                        ->withTrashed()->name('restore');
+                    Route::middleware('wiki.not_blocked')->group(function () {
+                        Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
+                        Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
 
-                    // Nominate this article for deletion (Articles for Deletion)
-                    Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
-                        ->name('deletions.store');
+                        // Owner-approval editing workflow: anyone can ask,
+                        // only the owner (or a Sysop/Bureaucrat) decides.
+                        Route::post('{article}/edit-requests', [WikiArticleEditRequestController::class, 'store'])
+                            ->name('edit-requests.store');
+                        Route::post('{article}/edit-requests/{editRequest}/approve', [WikiArticleEditRequestController::class, 'approve'])
+                            ->name('edit-requests.approve');
+                        Route::post('{article}/edit-requests/{editRequest}/reject', [WikiArticleEditRequestController::class, 'reject'])
+                            ->name('edit-requests.reject');
+
+                        // Administrator (Sysop) — the protect/restore forms
+                        // submit plain POST (no @method spoofing), hence POST here.
+                        Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
+                        Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
+                        Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
+                            ->withTrashed()->name('restore');
+
+                        // Nominate this article for deletion (Articles for Deletion)
+                        Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
+                            ->name('deletions.store');
+                    });
                 });
 
             Route::prefix('deletions')
@@ -521,10 +560,27 @@ Route::middleware('auth')->group(function () {
 
                     Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
                     Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
-                    Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
 
-                    // Administrator (Sysop)
-                    Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
+                    Route::middleware('wiki.not_blocked')->group(function () {
+                        Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
+
+                        // Administrator (Sysop)
+                        Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
+                    });
+                });
+
+            // Administrator (Sysop) / Bureaucrat: configure categories
+            Route::prefix('categories')
+                ->as('categories.')
+                ->middleware('wiki.not_blocked')
+                ->group(function () {
+
+                    Route::get('/', [WikiCategoryController::class, 'index'])->name('index');
+                    Route::get('create', [WikiCategoryController::class, 'create'])->name('create');
+                    Route::post('/', [WikiCategoryController::class, 'store'])->name('store');
+                    Route::get('{category}/edit', [WikiCategoryController::class, 'edit'])->name('edit');
+                    Route::put('{category}', [WikiCategoryController::class, 'update'])->name('update');
+                    Route::delete('{category}', [WikiCategoryController::class, 'destroy'])->name('destroy');
                 });
 
             // Administrator (Sysop): block disruptive users/IPs

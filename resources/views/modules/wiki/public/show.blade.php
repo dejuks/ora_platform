@@ -30,11 +30,11 @@
         <div class="ow-results-col">
             <div class="ow-article-body" style="white-space: pre-wrap;">{{ $article->content }}</div>
 
-            @if(isset($article->categories) && count($article->categories))
+            @if($article->categories->isNotEmpty())
                 <div class="ow-categories-strip">
                     <strong>Categories:</strong>
                     @foreach($article->categories as $category)
-                        <a href="#">{{ $category }}</a>@if(!$loop->last) ·@endif
+                        <a href="{{ route('wiki.public.category', $category) }}">{{ $category->name }}</a>@if(!$loop->last) ·@endif
                     @endforeach
                 </div>
             @endif

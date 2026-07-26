@@ -83,6 +83,39 @@ class Article extends Model
         return $this->hasOne(ArticleDeletionDiscussion::class)->where('status', 'open');
     }
 
+    public function categories()
+    {
+        return $this->belongsToMany(WikiCategory::class, 'article_wiki_category');
+    }
+
+    public function editRequests()
+    {
+        return $this->hasMany(ArticleEditRequest::class);
+    }
+
+    /**
+     * The requester's still-usable, owner-approved one-time edit
+     * pass for this article, if they have one.
+     */
+    public function consumableEditRequestFor(User $user): ?ArticleEditRequest
+    {
+        return $this->editRequests()
+            ->where('requester_id', $user->id)
+            ->approved()
+            ->whereNull('used_at')
+            ->latest()
+            ->first();
+    }
+
+    public function pendingEditRequestFor(User $user): ?ArticleEditRequest
+    {
+        return $this->editRequests()
+            ->where('requester_id', $user->id)
+            ->pending()
+            ->latest()
+            ->first();
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -124,5 +157,10 @@ class Article extends Model
     public function scopePublished($query)
     {
         return $query->where('status', 'published');
+    }
+
+    public function scopeInCategory($query, string $categorySlug)
+    {
+        return $query->whereHas('categories', fn ($q) => $q->where('slug', $categorySlug));
     }
 }

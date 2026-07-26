@@ -46,7 +46,7 @@ class BlockController extends Controller
             'expires_at' => ['nullable', 'date', 'after:now'],
         ]);
 
-        WikiBlock::create([
+        $block = WikiBlock::create([
             'user_id' => $data['target_type'] === 'user' ? $data['user_id'] : null,
             'ip_address' => $data['target_type'] === 'ip' ? $data['ip_address'] : null,
             'blocked_by' => Auth::id(),
@@ -54,9 +54,23 @@ class BlockController extends Controller
             'expires_at' => $data['expires_at'] ?? null,
         ]);
 
+        $autoblocked = 0;
+        if ($data['target_type'] === 'ip') {
+            $autoblocked = $this->autoblockAccountsBehindIp($block);
+        }
+
+        $message = 'Block applied.';
+        if ($autoblocked > 0) {
+            $message .= ' '.trans_choice(
+                '1 account logged in from this IP was also suspended (autoblock).|:count accounts logged in from this IP were also suspended (autoblock).',
+                $autoblocked,
+                ['count' => $autoblocked]
+            );
+        }
+
         return redirect()
             ->route('wiki.blocks.index')
-            ->with('success', 'Block applied.');
+            ->with('success', $message);
     }
 
     public function lift(WikiBlock $block)
@@ -68,7 +82,51 @@ class BlockController extends Controller
             'lifted_at' => now(),
         ]);
 
+        // Lifting an IP block also lifts every account it autoblocked,
+        // so an admin never has to remember to clear both separately.
+        $block->autoblocks()->active()->get()->each(function (WikiBlock $autoblock) {
+            $autoblock->update([
+                'lifted_by' => Auth::id(),
+                'lifted_at' => now(),
+            ]);
+        });
+
         return back()->with('success', 'Block lifted.');
+    }
+
+    /**
+     * An IP block alone doesn't stop a registered account that was
+     * using that IP — it just keeps its own session/cookies and can
+     * keep editing. Mirror MediaWiki's "autoblock": find any account
+     * that most recently logged in from this IP and place a linked
+     * block directly on the account, so it stays suspended even if
+     * it later switches to a different IP.
+     */
+    protected function autoblockAccountsBehindIp(WikiBlock $ipBlock): int
+    {
+        $accounts = User::where('last_login_ip', $ipBlock->ip_address)->get();
+
+        $count = 0;
+        foreach ($accounts as $account) {
+            $alreadyBlocked = WikiBlock::active()->where('user_id', $account->id)->exists();
+
+            if ($alreadyBlocked) {
+                continue;
+            }
+
+            WikiBlock::create([
+                'user_id' => $account->id,
+                'parent_block_id' => $ipBlock->id,
+                'is_autoblock' => true,
+                'blocked_by' => Auth::id(),
+                'reason' => "Autoblock: account was logged in from blocked IP {$ipBlock->ip_address}. ({$ipBlock->reason})",
+                'expires_at' => $ipBlock->expires_at,
+            ]);
+
+            $count++;
+        }
+
+        return $count;
     }
 
     protected function authorizePermission(string $permission): void
