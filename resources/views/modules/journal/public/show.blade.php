@@ -10,7 +10,7 @@
 
     <link href="{{ asset('vendors/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #0f172a; }
@@ -47,24 +47,21 @@
 
 <body>
 
-    <header class="site-header">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div>
-                <h1>ORA Journal</h1>
-                <small>Oromo Research Association &mdash; Published Articles</small>
-            </div>
-            <div>
-                <a href="{{ route('journal.public.index') }}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left"></i> All Articles
-                </a>
-            </div>
-        </div>
-    </header>
+    @include('partials.public-top-nav', ['active' => 'journal'])
+
+    <div class="container pt-3">
+        <a href="{{ route('journal.public.index') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> All Articles
+        </a>
+    </div>
 
     <div class="container">
         <div class="article-paper">
 
             <span class="badge badge-published mb-3">Published</span>
+            @if ($manuscript->category)
+                <span class="badge bg-light text-dark border mb-3">{{ $manuscript->category->name }}</span>
+            @endif
 
             <h1 class="h3 mb-3">{{ $manuscript->title }}</h1>
 

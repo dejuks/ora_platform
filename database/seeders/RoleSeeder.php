@@ -27,7 +27,7 @@ class RoleSeeder extends Seeder
                 'slug' => 'journal-manager',
                 'description' => 'Manages user accounts & permissions, configures journal settings, workflow, sections, and submission policies, oversees technical performance.',
                 'is_admin_role' => true,
-                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-workflow'],
+                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-workflow', 'manage-categories'],
             ],
             [
                 'name' => 'Editor-in-Chief',
