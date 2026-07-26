@@ -27,6 +27,12 @@
       </div>
     @endif
 
+    <div class="card mb-4">
+      <div class="card-body">
+        @include('modules.journal.manuscripts._workflow-steps')
+      </div>
+    </div>
+
     <form action="{{ route('journal.manuscripts.update', $manuscript) }}" method="POST" enctype="multipart/form-data">
       @csrf
       @method('PUT')
