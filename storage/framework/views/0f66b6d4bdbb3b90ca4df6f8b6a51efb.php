@@ -27,7 +27,7 @@
           <?php endif; ?>
         </h1>
         <p class="text-muted mb-0">
-          <span class="badge bg-secondary"><?php echo e($article->statusLabel()); ?></span>
+          <span class="badge <?php echo e($article->isDraft() ? 'bg-secondary' : 'bg-success'); ?>"><?php echo e($article->statusLabel()); ?></span>
           <?php if($article->protection_level !== 'none'): ?>
             <span class="badge bg-warning text-dark"><?php echo e($article->protectionLabel()); ?></span>
           <?php endif; ?>
