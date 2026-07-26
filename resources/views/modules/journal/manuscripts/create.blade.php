@@ -40,6 +40,18 @@
           </div>
 
           <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+              <option value="">— Select a category —</option>
+              @foreach($categories as $category)
+                <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
+                  {{ $category->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+
+          <div class="col-md-6">
             <label class="form-label">Manuscript File (PDF/DOC/DOCX, max 10MB)</label>
             <input type="file" name="manuscript_file" class="form-control">
             <small class="text-muted">Not required to save a draft — required before you push it for review.</small>
