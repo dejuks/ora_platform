@@ -28,7 +28,7 @@
 
     <div class="ow-content-grid">
         <div class="ow-results-col">
-            <div class="ow-article-body" style="white-space: pre-wrap;">{{ $article->content }}</div>
+            <div class="ow-article-body">{!! $article->content !!}</div>
 
             @if($article->categories->isNotEmpty())
                 <div class="ow-categories-strip">

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Mews\Purifier\Facades\Purifier;
 
 /**
  * The Oromo Wikipedia editing workflow:
@@ -25,9 +26,19 @@ class ArticleController extends Controller
 {
     public function index(Request $request)
     {
+        $user = Auth::user();
+
         $query = Article::with(['author', 'lastEditedBy', 'categories'])
             ->withTrashed()
             ->latest('updated_at');
+
+        // Drafts are private to their owner and Sysops/Bureaucrats —
+        // everyone else only sees published articles in this list.
+        if (! $user->hasModulePermission('wiki', 'moderate-content')) {
+            $query->where(function ($q) use ($user) {
+                $q->where('status', 'published')->orWhere('author_id', $user->id);
+            });
+        }
 
         if ($search = $request->query('q')) {
             $query->where('title', 'like', "%{$search}%");
@@ -62,18 +73,26 @@ class ArticleController extends Controller
             'edit_summary' => ['nullable', 'string', 'max:255'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['integer', 'exists:wiki_categories,id'],
+            'action' => ['required', 'in:draft,publish'],
         ]);
 
-        $article = DB::transaction(function () use ($data, $request) {
+        // CKEditor runs client-side only — this endpoint still accepts
+        // raw POST data, so sanitize server-side regardless of what
+        // was actually submitted through the editor.
+        $data['content'] = Purifier::clean($data['content'], 'wiki_article');
+
+        $status = $data['action'] === 'publish' ? 'published' : 'draft';
+
+        $article = DB::transaction(function () use ($data, $status, $request) {
 
             $article = Article::create([
                 'title' => $data['title'],
                 'slug' => $this->uniqueSlug($data['title']),
                 'content' => $data['content'],
-                'status' => 'published',
+                'status' => $status,
                 'author_id' => Auth::id(),
                 'last_edited_by' => Auth::id(),
-                'published_at' => now(),
+                'published_at' => $status === 'published' ? now() : null,
                 'created_by' => Auth::id(),
                 'updated_by' => Auth::id(),
             ]);
@@ -85,14 +104,20 @@ class ArticleController extends Controller
             return $article;
         });
 
+        $message = $status === 'published' ? 'Article published.' : 'Draft saved. Only you (and Administrators) can see it until you publish.';
+
         return redirect()
             ->route('wiki.articles.show', $article)
-            ->with('success', 'Article created.');
+            ->with('success', $message);
     }
 
     public function show(Article $article)
     {
         $article = Article::withTrashed()->with(['author', 'lastEditedBy', 'protectedBy', 'categories'])->findOrFail($article->id);
+
+        $user = Auth::user();
+
+        abort_unless($article->isVisibleTo($user), 404);
 
         $article->load(['revisions' => function ($q) {
             $q->where('is_suppressed', false)->with('editor');
@@ -100,7 +125,6 @@ class ArticleController extends Controller
 
         $openDiscussion = $article->openDeletionDiscussion()->with(['openedBy', 'comments.user'])->first();
 
-        $user = Auth::user();
         $isOwner = $article->author_id === $user->id;
         $canModerate = $user->hasModulePermission('wiki', 'moderate-content');
         $myConsumableRequest = $article->consumableEditRequestFor($user);
@@ -130,7 +154,10 @@ class ArticleController extends Controller
         $categories = \App\Models\WikiCategory::active()->ordered()->get();
         $selectedCategoryIds = $article->categories()->pluck('wiki_categories.id')->all();
 
-        return view('modules.wiki.articles.edit', compact('article', 'categories', 'selectedCategoryIds'));
+        $user = Auth::user();
+        $canChangeStatus = $article->author_id === $user->id || $user->hasModulePermission('wiki', 'moderate-content');
+
+        return view('modules.wiki.articles.edit', compact('article', 'categories', 'selectedCategoryIds', 'canChangeStatus'));
     }
 
     public function update(Request $request, Article $article)
@@ -143,16 +170,33 @@ class ArticleController extends Controller
             'edit_summary' => ['nullable', 'string', 'max:255'],
             'category_ids' => ['nullable', 'array'],
             'category_ids.*' => ['integer', 'exists:wiki_categories,id'],
+            'action' => ['nullable', 'in:draft,publish'],
         ]);
 
-        DB::transaction(function () use ($data, $article, $request) {
+        $data['content'] = Purifier::clean($data['content'], 'wiki_article');
 
-            $article->update([
+        $user = Auth::user();
+        $canChangeStatus = $article->author_id === $user->id || $user->hasModulePermission('wiki', 'moderate-content');
+
+        DB::transaction(function () use ($data, $article, $request, $canChangeStatus) {
+
+            $attributes = [
                 'title' => $data['title'],
                 'content' => $data['content'],
                 'last_edited_by' => Auth::id(),
                 'updated_by' => Auth::id(),
-            ]);
+            ];
+
+            if ($canChangeStatus && ! empty($data['action'])) {
+                $newStatus = $data['action'] === 'publish' ? 'published' : 'draft';
+                $attributes['status'] = $newStatus;
+
+                if ($newStatus === 'published' && $article->published_at === null) {
+                    $attributes['published_at'] = now();
+                }
+            }
+
+            $article->update($attributes);
 
             $article->categories()->sync($data['category_ids'] ?? []);
 
@@ -161,9 +205,13 @@ class ArticleController extends Controller
             $this->recordRevision($article, $data['content'], $data['edit_summary'] ?? 'Edited the article.', $request, $data['title']);
         });
 
+        $message = ($canChangeStatus && ($data['action'] ?? null) === 'draft')
+            ? 'Saved as draft. Only you (and Administrators) can see it.'
+            : 'Article updated.';
+
         return redirect()
             ->route('wiki.articles.show', $article)
-            ->with('success', 'Article updated.');
+            ->with('success', $message);
     }
 
     /*
@@ -276,6 +324,8 @@ class ArticleController extends Controller
         if ($user->hasModulePermission('wiki', 'moderate-content')) {
             return;
         }
+
+        abort_unless($article->isVisibleTo($user), 404);
 
         if ($article->isFullyProtected()) {
             abort(403, 'This page is fully protected. Only an Administrator can edit it.');

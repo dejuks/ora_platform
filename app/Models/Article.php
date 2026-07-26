@@ -127,6 +127,26 @@ class Article extends Model
         return self::STATUSES[$this->status] ?? $this->status;
     }
 
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    /**
+     * Drafts are private to the owner and any Sysop/Bureaucrat —
+     * nobody else can see them exist, let alone view or edit them.
+     * Published articles are open to everyone (subject to the usual
+     * edit-request workflow for non-owners).
+     */
+    public function isVisibleTo(User $user): bool
+    {
+        if (! $this->isDraft()) {
+            return true;
+        }
+
+        return $this->author_id === $user->id || $user->hasModulePermission('wiki', 'moderate-content');
+    }
+
     public function protectionLabel(): string
     {
         return self::PROTECTION_LEVELS[$this->protection_level] ?? $this->protection_level;

@@ -87,7 +87,7 @@
                       <span class="text-muted">—</span>
                     <?php endif; ?>
                   </td>
-                  <td><span class="badge bg-secondary"><?php echo e($article->statusLabel()); ?></span></td>
+                  <td><span class="badge <?php echo e($article->isDraft() ? 'bg-secondary' : 'bg-success'); ?>"><?php echo e($article->statusLabel()); ?></span></td>
                   <td>
                     <?php if($article->protection_level !== 'none'): ?>
                       <span class="badge bg-warning text-dark"><?php echo e($article->protectionLabel()); ?></span>

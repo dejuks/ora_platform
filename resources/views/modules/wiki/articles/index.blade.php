@@ -77,7 +77,7 @@
                       <span class="text-muted">—</span>
                     @endforelse
                   </td>
-                  <td><span class="badge bg-secondary">{{ $article->statusLabel() }}</span></td>
+                  <td><span class="badge {{ $article->isDraft() ? 'bg-secondary' : 'bg-success' }}">{{ $article->statusLabel() }}</span></td>
                   <td>
                     @if($article->protection_level !== 'none')
                       <span class="badge bg-warning text-dark">{{ $article->protectionLabel() }}</span>

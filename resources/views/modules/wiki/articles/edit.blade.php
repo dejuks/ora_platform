@@ -3,7 +3,10 @@
   <div class="main-content page-wiki-article-edit">
 
     <div class="mb-4">
-      <h1 class="h3 mb-1">Edit: {{ $article->title }}</h1>
+      <h1 class="h3 mb-1">
+        Edit: {{ $article->title }}
+        <span class="badge {{ $article->isDraft() ? 'bg-secondary' : 'bg-success' }}">{{ $article->statusLabel() }}</span>
+      </h1>
       <p class="text-muted mb-0">Saving creates a new revision — nothing is overwritten in the history.</p>
     </div>
 
@@ -37,7 +40,7 @@
 
           <div class="col-12">
             <label class="form-label">Content *</label>
-            <textarea name="content" class="form-control" rows="14" required>{{ old('content', $article->content) }}</textarea>
+            <textarea id="content" name="content" class="form-control" rows="14" required>{{ old('content', $article->content) }}</textarea>
           </div>
 
           <div class="col-12">
@@ -70,12 +73,30 @@
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-primary">Save Changes</button>
-        <a href="{{ route('wiki.articles.show', $article) }}" class="btn btn-outline-secondary">Cancel</a>
+        @if($canChangeStatus)
+          @if($article->isDraft())
+            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+              <i class="bi bi-file-earmark"></i> Save as Draft
+            </button>
+            <button type="submit" name="action" value="publish" class="btn btn-primary">
+              <i class="bi bi-send"></i> Publish
+            </button>
+          @else
+            <button type="submit" name="action" value="publish" class="btn btn-primary">Save Changes</button>
+            <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+              <i class="bi bi-arrow-return-left"></i> Unpublish to Draft
+            </button>
+          @endif
+        @else
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        @endif
+        <a href="{{ route('wiki.articles.show', $article) }}" class="btn btn-outline-secondary ms-auto">Cancel</a>
       </div>
 
     </form>
 
   </div>
+
+  @include('modules.wiki.articles._content-editor')
 
 </x-layout>

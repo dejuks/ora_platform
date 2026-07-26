@@ -46,7 +46,7 @@
 
           <div class="col-12">
             <label class="form-label">Content *</label>
-            <textarea name="content" class="form-control" rows="14" required><?php echo e(old('content', $article->content)); ?></textarea>
+            <textarea id="content" name="content" class="form-control" rows="14" required><?php echo e(old('content', $article->content)); ?></textarea>
           </div>
 
           <div class="col-12">
@@ -86,6 +86,8 @@
     </form>
 
   </div>
+
+  <?php echo $__env->make('modules.wiki.articles._content-editor', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
