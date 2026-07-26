@@ -117,9 +117,9 @@
 
         <h1>Verify your email</h1>
         <p class="lede">
-            We sent a verification link to
+            To use the platform, click the verification link we email to
             <strong>{{ auth()->user()->email }}</strong>.
-            Click it to activate your account — you'll need to do this before you can use the platform.
+            Don't see it yet? Check spam, or request a new one below.
         </p>
 
         @if(session('success'))
