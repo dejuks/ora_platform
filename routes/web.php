@@ -687,8 +687,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('books/{book}/clear', [EbookBookController::class, 'clear'])
                 ->name('books.clear');
 
-            // Digital Content Manager: convert + assign ISBN/DOI +
-            // set access rights + publish.
+            // Digital Content Manager: convert + assign ISBN/DOI,
+            // then send the proof to the author for approval.
+            Route::post('books/{book}/proof', [EbookBookController::class, 'uploadProof'])
+                ->name('books.proof.upload');
+
+            // Author: approve the proof, or send it back with notes.
+            Route::post('books/{book}/proof/approve', [EbookBookController::class, 'approveProof'])
+                ->name('books.proof.approve');
+
+            Route::post('books/{book}/proof/request-changes', [EbookBookController::class, 'requestProofChanges'])
+                ->name('books.proof.request-changes');
+
+            // Digital Content Manager: set access rights and go live —
+            // only reachable once the author has approved the proof.
             Route::post('books/{book}/publish', [EbookBookController::class, 'publish'])
                 ->name('books.publish');
 

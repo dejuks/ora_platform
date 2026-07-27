@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Book;
 use App\Models\EbookPayment;
 use App\Models\EbookSetting;
+use App\Notifications\AppNotification;
 use App\Services\ChapaService;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
@@ -25,6 +27,8 @@ use RuntimeException;
  */
 class PaymentController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function __construct(protected ChapaService $chapa)
     {
     }
@@ -183,10 +187,28 @@ class PaymentController extends Controller
             return;
         }
 
-        $payment->book->update([
+        $book = $payment->book;
+
+        $book->update([
             'payment_status' => 'paid',
             'fee_paid_at' => now(),
         ]);
+
+        $book->author?->notify(new AppNotification(
+            title: 'Payment received',
+            message: "Your Book Processing Charge payment for \"{$book->title}\" was received. Awaiting financial clearance.",
+            url: route('ebook.books.show', $book),
+            icon: 'bi-credit-card',
+            type: 'success',
+        ));
+
+        $this->notifyPermissionHolders('ebook', 'manage-payments', new AppNotification(
+            title: 'Payment received — clearance needed',
+            message: "\"{$book->title}\" has a settled Book Processing Charge and is awaiting your financial clearance.",
+            url: route('ebook.books.show', $book),
+            icon: 'bi-cash-coin',
+            type: 'info',
+        ));
     }
 
     protected function authorizeOwner(Book $book): void
