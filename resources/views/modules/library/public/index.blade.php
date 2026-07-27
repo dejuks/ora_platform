@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>ORA Digital Library - Published eBooks</title>
+    <title>ORA Library Catalog</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="{{ asset('vendors/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
@@ -26,28 +26,10 @@
         .search-box .form-control { border-radius: 10px 0 0 10px; padding: 12px 15px; }
         .search-box .btn { border-radius: 0 10px 10px 0; }
 
-        .book-card {
-            background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            overflow: hidden;
-            height: 100%;
-            transition: 0.2s;
-        }
-
+        .book-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; overflow: hidden; height: 100%; transition: 0.2s; }
         .book-card:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.06); transform: translateY(-2px); }
 
-        .book-cover {
-            height: 180px;
-            background: #e2e8f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #94a3b8;
-            font-size: 40px;
-        }
-
-        .book-cover img { width: 100%; height: 100%; object-fit: cover; }
+        .book-cover { height: 160px; background: #e2e8f0; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 40px; }
 
         .book-card-body { padding: 20px; }
         .book-card-body h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; }
@@ -55,10 +37,9 @@
         .book-card-body h3 a:hover { color: #2563eb; }
 
         .book-meta { font-size: 13px; color: #64748b; margin-bottom: 10px; }
-        .book-abstract { font-size: 14px; color: #475569; }
 
-        .badge-access-open { background: #dcfce7; color: #166534; }
-        .badge-access-restricted { background: #fef3c7; color: #92400e; }
+        .badge-available { background: #dcfce7; color: #166534; }
+        .badge-unavailable { background: #fef3c7; color: #92400e; }
 
         footer { padding: 30px 0; text-align: center; color: #94a3b8; font-size: 13px; }
     </style>
@@ -68,18 +49,17 @@
 
     <header class="site-header">
         <div class="container d-flex justify-content-between align-items-center">
-            <a href="{{ route('ebook.public.index') }}" class="brand">
-                ORA Digital Library
-                <small>Oromo Research Association</small>
+            <a href="{{ route('library.public.index') }}" class="brand">
+                ORA Library Catalog
+                <small>Oromo Research Association — Physical Collection</small>
             </a>
             <nav class="nav-links">
-                <a href="{{ route('ebook.public.index') }}">Published Books</a>
-                <a href="{{ route('library.public.index') }}">Physical Library</a>
+                <a href="{{ route('ebook.public.index') }}">Digital Bookstore</a>
                 @auth
-                    <a href="{{ route('ebook.my-library') }}">My Digital Library</a>
+                    <a href="{{ route('library.dashboard') }}">My Library Account</a>
                 @else
                     <a href="{{ route('login') }}">Sign In</a>
-                    <a href="{{ route('register') }}">Sign Up</a>
+                    <a href="{{ route('register') }}">Become a Member</a>
                 @endauth
             </nav>
         </div>
@@ -87,12 +67,12 @@
 
     <div class="hero">
         <div class="container">
-            <h1>Published eBooks</h1>
-            <p>Peer-reviewed books from the ORA Digital Library — Open Access titles free to read by anyone.</p>
+            <h1>Browse the Shelves</h1>
+            <p>Search the Association's physical collection. Reserve a title online, then pick it up in person — no need to already be a member, we'll sign you up when you reserve.</p>
 
-            <form action="{{ route('ebook.public.index') }}" method="GET" class="d-flex search-box mt-3">
+            <form action="{{ route('library.public.index') }}" method="GET" class="d-flex search-box mt-3">
                 <input type="text" name="q" value="{{ request('q') }}" class="form-control"
-                       placeholder="Search by title or keyword…">
+                       placeholder="Search by title, author, subject, or ISBN…">
                 <button class="btn btn-primary"><i class="bi bi-search"></i></button>
             </form>
         </div>
@@ -100,41 +80,41 @@
 
     <div class="container pb-5">
 
+        @if(session('success'))
+            <div class="alert alert-success">{{ session('success') }}</div>
+        @endif
+        @if(session('info'))
+            <div class="alert alert-info">{{ session('info') }}</div>
+        @endif
+        @if(session('error'))
+            <div class="alert alert-warning">{{ session('error') }}</div>
+        @endif
+
         <div class="row g-4">
             @forelse($books as $book)
                 <div class="col-md-6 col-lg-4">
                     <div class="book-card">
                         <div class="book-cover">
-                            @if($book->cover_image)
-                                <img src="{{ \Illuminate\Support\Facades\Storage::url($book->cover_image) }}" alt="{{ $book->title }}">
-                            @else
-                                <i class="bi bi-book"></i>
-                            @endif
+                            <i class="bi bi-journal-bookmark"></i>
                         </div>
                         <div class="book-card-body">
-                            <span class="badge {{ $book->access_type === 'open_access' ? 'badge-access-open' : 'badge-access-restricted' }} mb-2">
-                                {{ $book->accessTypeLabel() }}
+                            <span class="badge {{ $book->available_copies_count > 0 ? 'badge-available' : 'badge-unavailable' }} mb-2">
+                                {{ $book->available_copies_count > 0 ? $book->available_copies_count.' available' : 'All copies checked out' }}
                             </span>
-                            @if($book->access_type === 'for_sale' && $book->price)
-                                <span class="badge bg-primary mb-2">ETB {{ number_format($book->price, 2) }}</span>
-                            @endif
-                            <h3><a href="{{ route('ebook.public.show', $book) }}">{{ $book->title }}</a></h3>
+                            <h3><a href="{{ route('library.public.show', $book) }}">{{ $book->title }}</a></h3>
                             <div class="book-meta">
-                                By {{ $book->author->full_name }} ·
-                                {{ optional($book->published_at)->format('M d, Y') }}
+                                @if($book->author) By {{ $book->author }} @endif
+                                @if($book->publication_year) · {{ $book->publication_year }} @endif
                             </div>
-                            <p class="book-abstract">
-                                {{ \Illuminate\Support\Str::limit($book->abstract, 120) }}
-                            </p>
-                            <a href="{{ route('ebook.public.show', $book) }}" class="btn btn-sm btn-outline-primary mt-2">
-                                View Book
+                            <a href="{{ route('library.public.show', $book) }}" class="btn btn-sm btn-outline-primary mt-2">
+                                View Details
                             </a>
                         </div>
                     </div>
                 </div>
             @empty
                 <div class="col-12">
-                    <p class="text-muted text-center py-5">No published books yet. Check back soon.</p>
+                    <p class="text-muted text-center py-5">No titles in the catalog yet. Check back soon.</p>
                 </div>
             @endforelse
         </div>
@@ -146,7 +126,7 @@
     </div>
 
     <footer>
-        © {{ date('Y') }} Oromo Research Association (ORA) — eBook Publishing System
+        © {{ date('Y') }} Oromo Research Association (ORA) — Library Management System
     </footer>
 
 </body>
