@@ -3,15 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Auth\MustVerifyEmail as MustVerifyEmailTrait;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
-    use HasFactory, MustVerifyEmailTrait, Notifiable, SoftDeletes;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $fillable = [
 
@@ -34,10 +32,6 @@ class User extends Authenticatable implements MustVerifyEmail
         'date_of_birth',
 
         'profile_photo',
-
-        'notify_in_app',
-
-        'notify_email',
 
         'password',
 
@@ -75,10 +69,6 @@ class User extends Authenticatable implements MustVerifyEmail
 
             'is_super_admin' => 'boolean',
 
-            'notify_in_app' => 'boolean',
-
-            'notify_email' => 'boolean',
-
             'email_verified' => 'boolean',
 
             'email_verified_at' => 'datetime',
@@ -104,20 +94,6 @@ class User extends Authenticatable implements MustVerifyEmail
         return trim(
             "{$this->first_name} {$this->middle_name} {$this->last_name}"
         );
-    }
-
-    /**
-     * Laravel's MustVerifyEmail trait only touches email_verified_at.
-     * This table also carries a separate email_verified boolean
-     * (used by admin listings/seeders) — keep both in sync so nothing
-     * that reads the boolean silently goes stale.
-     */
-    public function markEmailAsVerified(): bool
-    {
-        return $this->forceFill([
-            'email_verified_at' => $this->freshTimestamp(),
-            'email_verified' => true,
-        ])->save();
     }
 
     /*
@@ -152,11 +128,12 @@ public function libraryMember()
 }
 
 /**
- * This user's audit trail — powers the Activity Log page.
+ * Digital Bookstore: every purchase this reader has made, completed
+ * or otherwise. See EbookOrder / "My Digital Library".
  */
-public function activityLogs()
+public function ebookOrders()
 {
-    return $this->hasMany(ActivityLog::class)->latest();
+    return $this->hasMany(EbookOrder::class);
 }
 
 /**
