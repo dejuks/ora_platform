@@ -32,6 +32,8 @@ class Book extends Model
         'ebook_epub',
         'cover_image',
         'access_type',
+        'price',
+        'is_purchasable',
         'embargo_until',
         'produced_by',
         'submitted_at',
@@ -53,6 +55,8 @@ class Book extends Model
             'embargo_until' => 'datetime',
             'processing_fee' => 'decimal:2',
             'waiver_requested' => 'boolean',
+            'price' => 'decimal:2',
+            'is_purchasable' => 'boolean',
         ];
     }
 
@@ -77,6 +81,7 @@ class Book extends Model
         'open_access' => 'Open Access',
         'restricted' => 'Restricted (registered readers only)',
         'embargoed' => 'Embargoed',
+        'for_sale' => 'For Sale (purchase required)',
     ];
 
     /*
@@ -120,6 +125,15 @@ class Book extends Model
         return $this->hasMany(EbookPayment::class);
     }
 
+    /**
+     * Reader purchases of this title (only relevant when access_type
+     * is 'for_sale') — see EbookOrder.
+     */
+    public function orders()
+    {
+        return $this->hasMany(EbookOrder::class);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -129,6 +143,68 @@ class Book extends Model
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? $this->status;
+    }
+
+    /**
+     * The full submission-to-publishing pipeline, as steps for display
+     * (e.g. the progress stepper on the book page). Each step comes
+     * back with a 'state':
+     *
+     *   - complete: already passed through this step
+     *   - current:  the book is here right now (green)
+     *   - upcoming: hasn't reached this step yet (gray)
+     *   - warning:  paused here pending author action (amber)
+     *   - danger:   stopped here, rejected (red)
+     *
+     * 'desk_rejected', 'minor_revision', 'major_revision', and
+     * 'rejected' aren't steps of their own — they're exception states
+     * layered onto the happy-path step they interrupted, so the
+     * stepper always shows one continuous line rather than a dead
+     * branch.
+     */
+    public function workflowSteps(): array
+    {
+        $steps = [
+            'submitted' => 'Submitted',
+            'screening' => 'Editorial Screening',
+            'under_review' => 'Peer Review',
+            'accepted' => 'Accepted',
+            'financial_clearance' => 'Financial Clearance',
+            'in_production' => 'In Production',
+            'published' => 'Published',
+        ];
+
+        $order = array_keys($steps);
+
+        $exceptions = [
+            'desk_rejected' => ['at' => 'screening', 'state' => 'danger', 'label' => 'Desk Rejected'],
+            'minor_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Minor Revision Requested'],
+            'major_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Major Revision Requested'],
+            'rejected' => ['at' => 'accepted', 'state' => 'danger', 'label' => 'Rejected'],
+        ];
+
+        $exception = $exceptions[$this->status] ?? null;
+        $effectiveKey = $exception['at'] ?? $this->status;
+        $currentIndex = array_search($effectiveKey, $order, true);
+
+        $result = [];
+
+        foreach ($order as $i => $key) {
+            if ($currentIndex === false || $i < $currentIndex) {
+                $state = 'complete';
+                $label = $steps[$key];
+            } elseif ($i === $currentIndex) {
+                $state = $exception['state'] ?? 'current';
+                $label = $exception['label'] ?? $steps[$key];
+            } else {
+                $state = 'upcoming';
+                $label = $steps[$key];
+            }
+
+            $result[] = ['key' => $key, 'label' => $label, 'state' => $state];
+        }
+
+        return $result;
     }
 
     public function accessTypeLabel(): string
@@ -201,11 +277,16 @@ class Book extends Model
     /**
      * Whether a reader can access this book right now, given its
      * access type and (for embargoed titles) whether the embargo has
-     * lifted yet.
+     * lifted yet. A 'for_sale' title is never freely readable here —
+     * see isPurchasedBy() for whether a specific reader has bought it.
      */
     public function isReadableNow(): bool
     {
         if ($this->status !== 'published') {
+            return false;
+        }
+
+        if ($this->access_type === 'for_sale') {
             return false;
         }
 
@@ -214,6 +295,23 @@ class Book extends Model
         }
 
         return true;
+    }
+
+    /**
+     * Whether the given user (or null for a guest) already owns this
+     * 'for_sale' title — the gate the download route and the
+     * storefront's "Buy" vs "Download" button both check.
+     */
+    public function isPurchasedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $this->orders()
+            ->where('user_id', $user->id)
+            ->where('status', 'completed')
+            ->exists();
     }
 
     /*
@@ -229,10 +327,22 @@ class Book extends Model
 
     public function scopeReadableNow($query)
     {
-        return $query->published()->where(function ($q) {
-            $q->where('access_type', '!=', 'embargoed')
-                ->orWhereNull('embargo_until')
-                ->orWhere('embargo_until', '<=', now());
-        });
+        return $query->published()
+            ->where('access_type', '!=', 'for_sale')
+            ->where(function ($q) {
+                $q->where('access_type', '!=', 'embargoed')
+                    ->orWhereNull('embargo_until')
+                    ->orWhere('embargo_until', '<=', now());
+            });
+    }
+
+    /**
+     * Titles currently on sale in the storefront.
+     */
+    public function scopeForSale($query)
+    {
+        return $query->published()
+            ->where('access_type', 'for_sale')
+            ->where('is_purchasable', true);
     }
 }

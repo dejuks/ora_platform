@@ -452,19 +452,40 @@ class BookController extends Controller
     /**
      * Reader: download a published, currently-accessible eBook.
      * Restricted titles require login; embargoed titles are blocked
-     * until the embargo date passes; open access is unconditional.
+     * until the embargo date passes; open access is unconditional;
+     * 'for_sale' titles require a completed purchase (see EbookOrder
+     * / Ebook\OrderController) — isReadableNow() excludes 'for_sale'
+     * entirely, so that case is handled separately below.
      */
     public function download(Book $book)
     {
-        abort_unless($book->isReadableNow(), 404);
+        $isForSale = $book->status === 'published' && $book->access_type === 'for_sale';
+
+        abort_unless($book->isReadableNow() || $isForSale, 404);
 
         if ($book->access_type === 'restricted') {
             abort_unless(Auth::check(), 401, 'Please sign in to download this restricted title.');
         }
 
+        if ($isForSale) {
+            abort_unless(Auth::check(), 401, 'Please sign in to download this title.');
+            abort_unless(
+                $book->isPurchasedBy(Auth::user()) || Auth::user()->isSuperAdmin(),
+                403,
+                'You need to purchase this title before downloading it.'
+            );
+        }
+
         abort_unless($book->ebook_pdf, 404, 'No file available for this title yet.');
 
         $book->increment('downloads_count');
+
+        if ($isForSale) {
+            $book->orders()
+                ->where('user_id', Auth::id())
+                ->where('status', 'completed')
+                ->increment('download_count');
+        }
 
         return Storage::disk('public')->download($book->ebook_pdf, $book->title.'.pdf');
     }

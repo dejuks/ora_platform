@@ -16,11 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
             'module.access' => \App\Http\Middleware\EnsureModuleAccess::class,
             'module.admin' => \App\Http\Middleware\EnsureModuleAdmin::class,
             'module.permission' => \App\Http\Middleware\EnsureModulePermission::class,
-            'wiki.not_blocked' => \App\Http\Middleware\EnsureNotWikiBlocked::class,
-            // Overrides Laravel's built-in 'verified' middleware so
-            // the email-verification gate can be turned off from
-            // Settings without touching every route definition.
-            'verified' => \App\Http\Middleware\EnsureEmailIsVerifiedIfRequired::class,
         ]);
 
         // Chapa calls these routes server-to-server with no session and
@@ -28,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'journal/payments/chapa/webhook',
             'ebook/payments/chapa/webhook',
+            'ebook/orders/chapa/webhook',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

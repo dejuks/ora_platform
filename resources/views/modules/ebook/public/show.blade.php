@@ -90,10 +90,40 @@
                     @endif
                 </div>
 
+                @if($book->access_type === 'for_sale')
+                    @if($book->price)
+                        <div class="d-flex align-items-center gap-2 mb-3">
+                            <span class="h4 mb-0">ETB {{ number_format($book->price, 2) }}</span>
+                        </div>
+                    @endif
+                @endif
+
                 <h5>About this Book</h5>
                 <p>{{ $book->abstract }}</p>
 
-                @if($book->access_type === 'restricted' && ! auth()->check())
+                @if($book->access_type === 'for_sale')
+                    @auth
+                        @if($book->isPurchasedBy(auth()->user()))
+                            <a href="{{ route('ebook.books.download', $book) }}" class="btn btn-primary mt-3">
+                                <i class="bi bi-download"></i> Download Your Copy
+                            </a>
+                            <p class="text-muted small mt-2">
+                                Already in your <a href="{{ route('ebook.my-library') }}">Digital Library</a>.
+                            </p>
+                        @else
+                            <a href="{{ route('ebook.books.checkout', $book) }}" class="btn btn-success mt-3">
+                                <i class="bi bi-cart"></i> Buy for ETB {{ number_format($book->price, 2) }}
+                            </a>
+                        @endif
+                    @else
+                        <a href="{{ route('login') }}" class="btn btn-success mt-3">
+                            <i class="bi bi-cart"></i> Sign In to Buy — ETB {{ number_format($book->price, 2) }}
+                        </a>
+                        <p class="text-muted small mt-2">
+                            New here? <a href="{{ route('register') }}">Create an account</a> to purchase this title.
+                        </p>
+                    @endauth
+                @elseif($book->access_type === 'restricted' && ! auth()->check())
                     <div class="alert alert-warning mt-3">
                         <i class="bi bi-lock"></i>
                         This is a restricted title — <a href="{{ route('login') }}">sign in</a> to download it.
