@@ -1,0 +1,152 @@
+--- a/routes/web.php	2026-07-27 03:27:41.000000000 +0000
++++ b/routes/web.php	2026-07-27 03:50:39.810526727 +0000
+@@ -1,5 +1,8 @@
+ <?php
+ 
++use App\Http\Controllers\Account\ActivityLogController;
++use App\Http\Controllers\Account\ProfileController as AccountProfileController;
++use App\Http\Controllers\Account\SettingsController as AccountSettingsController;
+ use App\Http\Controllers\Admin\ModuleController;
+ use App\Http\Controllers\Admin\PermissionController;
+ use App\Http\Controllers\Admin\RoleController;
+@@ -12,6 +15,7 @@
+ use App\Http\Controllers\DashboardController;
+ use App\Http\Controllers\JoinController;
+ use App\Http\Controllers\ModuleEnrollmentController;
++use App\Http\Controllers\NotificationController;
+ use App\Http\Controllers\PortalController;
+ use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
+ use App\Http\Controllers\Ebook\BookController as EbookBookController;
+@@ -326,6 +330,61 @@
+ 
+     /*
+     |--------------------------------------------------------------------------
++    | ACCOUNT — "My Profile" menu (profile, settings, activity log)
++    |--------------------------------------------------------------------------
++    */
++
++    Route::prefix('account')
++        ->as('account.')
++        ->group(function () {
++
++            Route::get('profile', [AccountProfileController::class, 'edit'])
++                ->name('profile.edit');
++
++            Route::put('profile', [AccountProfileController::class, 'update'])
++                ->name('profile.update');
++
++            Route::post('profile/photo', [AccountProfileController::class, 'updatePhoto'])
++                ->name('profile.photo');
++
++            Route::put('profile/password', [AccountProfileController::class, 'updatePassword'])
++                ->name('profile.password');
++
++            Route::get('settings', [AccountSettingsController::class, 'edit'])
++                ->name('settings.edit');
++
++            Route::put('settings', [AccountSettingsController::class, 'update'])
++                ->name('settings.update');
++
++            Route::get('activity-log', [ActivityLogController::class, 'index'])
++                ->name('activity.index');
++        });
++
++    /*
++    |--------------------------------------------------------------------------
++    | NOTIFICATIONS — in-app notification bell + full list
++    |--------------------------------------------------------------------------
++    */
++
++    Route::prefix('notifications')
++        ->as('notifications.')
++        ->group(function () {
++
++            Route::get('/', [NotificationController::class, 'index'])
++                ->name('index');
++
++            Route::get('{notification}/open', [NotificationController::class, 'open'])
++                ->name('open');
++
++            Route::post('{notification}/read', [NotificationController::class, 'markRead'])
++                ->name('read');
++
++            Route::post('mark-all-read', [NotificationController::class, 'markAllRead'])
++                ->name('mark-all-read');
++        });
++
++    /*
++    |--------------------------------------------------------------------------
+     | SUPER ADMIN
+     |--------------------------------------------------------------------------
+     |
+--- a/app/Models/Book.php	2026-07-25 01:31:46.000000000 +0000
++++ b/app/Models/Book.php	2026-07-27 04:13:55.067978257 +0000
+@@ -145,6 +145,68 @@
+         return self::STATUSES[$this->status] ?? $this->status;
+     }
+ 
++    /**
++     * The full submission-to-publishing pipeline, as steps for display
++     * (e.g. the progress stepper on the book page). Each step comes
++     * back with a 'state':
++     *
++     *   - complete: already passed through this step
++     *   - current:  the book is here right now (green)
++     *   - upcoming: hasn't reached this step yet (gray)
++     *   - warning:  paused here pending author action (amber)
++     *   - danger:   stopped here, rejected (red)
++     *
++     * 'desk_rejected', 'minor_revision', 'major_revision', and
++     * 'rejected' aren't steps of their own — they're exception states
++     * layered onto the happy-path step they interrupted, so the
++     * stepper always shows one continuous line rather than a dead
++     * branch.
++     */
++    public function workflowSteps(): array
++    {
++        $steps = [
++            'submitted' => 'Submitted',
++            'screening' => 'Editorial Screening',
++            'under_review' => 'Peer Review',
++            'accepted' => 'Accepted',
++            'financial_clearance' => 'Financial Clearance',
++            'in_production' => 'In Production',
++            'published' => 'Published',
++        ];
++
++        $order = array_keys($steps);
++
++        $exceptions = [
++            'desk_rejected' => ['at' => 'screening', 'state' => 'danger', 'label' => 'Desk Rejected'],
++            'minor_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Minor Revision Requested'],
++            'major_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Major Revision Requested'],
++            'rejected' => ['at' => 'accepted', 'state' => 'danger', 'label' => 'Rejected'],
++        ];
++
++        $exception = $exceptions[$this->status] ?? null;
++        $effectiveKey = $exception['at'] ?? $this->status;
++        $currentIndex = array_search($effectiveKey, $order, true);
++
++        $result = [];
++
++        foreach ($order as $i => $key) {
++            if ($currentIndex === false || $i < $currentIndex) {
++                $state = 'complete';
++                $label = $steps[$key];
++            } elseif ($i === $currentIndex) {
++                $state = $exception['state'] ?? 'current';
++                $label = $exception['label'] ?? $steps[$key];
++            } else {
++                $state = 'upcoming';
++                $label = $steps[$key];
++            }
++
++            $result[] = ['key' => $key, 'label' => $label, 'state' => $state];
++        }
++
++        return $result;
++    }
++
+     public function accessTypeLabel(): string
+     {
+         return self::ACCESS_TYPES[$this->access_type] ?? $this->access_type;
