@@ -47,6 +47,36 @@ class SidebarService
 
             $modules = Module::active()->orderBy('name')->get();
 
+            // One place for every platform-wide toggle plus every
+            // module's own payment configuration — instead of each
+            // being reachable only by typing the URL directly.
+            // 'General' always shows; a module's payment settings
+            // link only shows up once that module actually defines
+            // a {code}.settings.edit route, so adding a settings
+            // page to a new module is all it takes to appear here.
+            $settingsChildren = [
+                ['title' => 'General', 'icon' => 'bi-toggles', 'route' => 'admin.settings.edit'],
+            ];
+
+            foreach ($modules as $module) {
+                $moduleSettingsRoute = "{$module->code}.settings.edit";
+
+                if (Route::has($moduleSettingsRoute)) {
+                    $settingsChildren[] = [
+                        'title' => "{$module->name} Payment",
+                        'icon' => 'bi-cash-coin',
+                        'route' => $moduleSettingsRoute,
+                    ];
+                }
+            }
+
+            $menu[] = [
+                'title' => 'Settings',
+                'icon' => 'bi-gear',
+                'route' => 'admin.settings.edit',
+                'children' => $settingsChildren,
+            ];
+
         } else {
 
             $moduleIds = $user->moduleRoles()->pluck('roles.module_id')->unique();
