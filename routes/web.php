@@ -291,7 +291,7 @@ Route::middleware('guest')->group(function () {
 
     // Public self-registration — any visitor can create their own
     // Author account and start submitting manuscripts right away.
-   Route::get('/register', [RegisterController::class, 'showRegister'])
+    Route::get('/register', [RegisterController::class, 'showRegister'])
         ->name('register');
 
     Route::post('/register', [RegisterController::class, 'register'])

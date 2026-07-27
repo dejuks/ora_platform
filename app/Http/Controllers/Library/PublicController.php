@@ -20,6 +20,17 @@ use Illuminate\Support\Facades\Auth;
  * AuthorEnrollmentController). Checkout and return of the physical
  * copy still happen in person at the circulation desk — see
  * Library\CirculationController, untouched by this portal.
+ *
+ * Supports the same query-string filters as Journal's public portal,
+ * combinable:
+ *   ?q=climate            free-text search (title/author/subject/ISBN)
+ *   ?subject=Fiction      filter by subject (the catalog's stand-in
+ *                         for Journal's category — books don't have a
+ *                         dedicated category table, just a free-text
+ *                         'subject' field, so the sidebar groups on
+ *                         that instead)
+ *   ?letter=B             A-Z filter, first letter of the title
+ *   ?sort=az|za|latest    default: az
  */
 class PublicController extends Controller
 {
@@ -29,7 +40,7 @@ class PublicController extends Controller
 
     public function index(Request $request)
     {
-        $books = LibraryBook::active()
+        $query = LibraryBook::active()
             ->withCount([
                 'copies as available_copies_count' => fn ($q) => $q->where('status', 'available'),
                 'copies as total_copies_count',
@@ -43,11 +54,37 @@ class PublicController extends Controller
                         ->orWhere('isbn', 'like', "%{$term}%");
                 });
             })
-            ->orderBy('title')
-            ->paginate(12)
-            ->withQueryString();
+            ->when($request->filled('subject'), function ($query) use ($request) {
+                $query->where('subject', $request->string('subject'));
+            })
+            ->when($request->filled('letter') && $request->get('letter') !== 'ALL', function ($query) use ($request) {
+                $query->where('title', 'like', strtoupper($request->string('letter')).'%');
+            });
 
-        return view('modules.library.public.index', compact('books'));
+        $sort = $request->get('sort', 'az');
+        match ($sort) {
+            'za' => $query->orderByDesc('title'),
+            'latest' => $query->latest('created_at'),
+            default => $query->orderBy('title'),
+        };
+
+        $books = $query->paginate(12)->withQueryString();
+
+        // Subject sidebar — the catalog's stand-in for Journal's
+        // category list. Grouped from the free-text 'subject' column
+        // rather than a dedicated table, so this only surfaces
+        // subjects that are actually in use, each with its own count.
+        $subjects = LibraryBook::active()
+            ->whereNotNull('subject')
+            ->where('subject', '!=', '')
+            ->selectRaw('subject, count(*) as books_count')
+            ->groupBy('subject')
+            ->orderBy('subject')
+            ->get();
+
+        $letters = range('A', 'Z');
+
+        return view('modules.library.public.index', compact('books', 'subjects', 'letters'));
     }
 
     public function show(LibraryBook $book)
