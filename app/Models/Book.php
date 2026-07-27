@@ -133,6 +133,71 @@ class Book extends Model
     |--------------------------------------------------------------------------
     */
 
+    /**
+     * The full submission-to-publishing pipeline, as steps for display
+     * (a progress stepper on the book page). Each step comes back
+     * with a 'state':
+     *
+     *   - complete: already passed through this step
+     *   - current:  the book is here right now (green)
+     *   - upcoming: hasn't reached this step yet (gray)
+     *   - warning:  paused here pending author action (amber)
+     *   - danger:   stopped here, rejected (red)
+     *
+     * 'desk_rejected', 'minor_revision', 'major_revision', and
+     * 'rejected' aren't steps of their own — they're exception states
+     * layered onto the happy-path step they interrupted, so the
+     * stepper always shows one continuous line rather than a dead
+     * branch. 'accepted' never actually gets stored as a status (see
+     * BookController::decide() — an accept goes straight to
+     * 'financial_clearance'), so it isn't in the step order either.
+     */
+    public function workflowSteps(): array
+    {
+        $steps = [
+            'submitted' => 'Submitted',
+            'screening' => 'Editorial Screening',
+            'under_review' => 'Peer Review',
+            'financial_clearance' => 'Financial Clearance',
+            'in_production' => 'Digital Production',
+            'proof_review' => 'Author Proof Review',
+            'ready_to_publish' => 'Ready to Publish',
+            'published' => 'Published',
+        ];
+
+        $order = array_keys($steps);
+
+        $exceptions = [
+            'desk_rejected' => ['at' => 'screening', 'state' => 'danger', 'label' => 'Desk Rejected'],
+            'minor_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Minor Revision Requested'],
+            'major_revision' => ['at' => 'under_review', 'state' => 'warning', 'label' => 'Major Revision Requested'],
+            'rejected' => ['at' => 'financial_clearance', 'state' => 'danger', 'label' => 'Rejected'],
+        ];
+
+        $exception = $exceptions[$this->status] ?? null;
+        $effectiveKey = $exception['at'] ?? $this->status;
+        $currentIndex = array_search($effectiveKey, $order, true);
+
+        $result = [];
+
+        foreach ($order as $i => $key) {
+            if ($currentIndex === false || $i < $currentIndex) {
+                $state = 'complete';
+                $label = $steps[$key];
+            } elseif ($i === $currentIndex) {
+                $state = $exception['state'] ?? 'current';
+                $label = $exception['label'] ?? $steps[$key];
+            } else {
+                $state = 'upcoming';
+                $label = $steps[$key];
+            }
+
+            $result[] = ['key' => $key, 'label' => $label, 'state' => $state];
+        }
+
+        return $result;
+    }
+
     public function statusLabel(): string
     {
         return self::STATUSES[$this->status] ?? $this->status;

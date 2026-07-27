@@ -27,6 +27,12 @@
       </div>
     @endif
 
+    <div class="card mb-4">
+      <div class="card-body">
+        @include('modules.ebook.books._workflow-steps')
+      </div>
+    </div>
+
     <form action="{{ route('ebook.books.update', $book) }}" method="POST" enctype="multipart/form-data">
       @csrf
       @method('PUT')
