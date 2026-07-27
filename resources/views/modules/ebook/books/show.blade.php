@@ -262,29 +262,23 @@
           </div>
         @endif
 
-        {{-- DIGITAL CONTENT MANAGER: Production & Publish --}}
+        {{-- DIGITAL CONTENT MANAGER: Upload Proof (convert + assign ISBN/DOI) --}}
         @if($canProduce && $book->status === 'in_production')
           <div class="card mb-4">
-            <div class="card-header"><strong>Digital Production</strong></div>
+            <div class="card-header"><strong>Digital Production — Upload Proof</strong></div>
             <div class="card-body">
-              <form action="{{ route('ebook.books.publish', $book) }}" method="POST" enctype="multipart/form-data">
+              @if($book->proof_change_notes)
+                <div class="alert alert-warning">
+                  <strong>Author requested changes:</strong>
+                  <p class="mb-0">{{ $book->proof_change_notes }}</p>
+                </div>
+              @endif
+              <form action="{{ route('ebook.books.proof.upload', $book) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label">ISBN</label>
-                    <input type="text" name="isbn" class="form-control" placeholder="978-...">
-                  </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Access Type *</label>
-                    <select name="access_type" class="form-select" required id="accessType">
-                      @foreach(\App\Models\Book::ACCESS_TYPES as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                      @endforeach
-                    </select>
-                  </div>
-                  <div class="col-md-6" id="embargoField" style="display:none">
-                    <label class="form-label">Embargo Until</label>
-                    <input type="date" name="embargo_until" class="form-control">
+                    <input type="text" name="isbn" class="form-control" value="{{ $book->isbn }}" placeholder="978-...">
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Cover Image</label>
@@ -297,6 +291,69 @@
                   <div class="col-md-6">
                     <label class="form-label">Final eBook (EPUB)</label>
                     <input type="file" name="ebook_epub" class="form-control" accept=".epub">
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">
+                  <i class="bi bi-send-check"></i> Send Proof to Author
+                </button>
+              </form>
+            </div>
+          </div>
+        @endif
+
+        {{-- AUTHOR: Approve final proof before publication --}}
+        @if($book->author_id === $user->id && $book->status === 'proof_review')
+          <div class="card mb-4 border-primary">
+            <div class="card-header bg-primary-subtle"><strong>Action Needed: Review Your Proof</strong></div>
+            <div class="card-body">
+              <p>The Digital Content Manager has prepared the final proof for <strong>"{{ $book->title }}"</strong>. Review it before it's published.</p>
+              @if($book->ebook_pdf)
+                <a href="{{ Illuminate\Support\Facades\Storage::url($book->ebook_pdf) }}" target="_blank" class="btn btn-outline-primary mb-3">
+                  <i class="bi bi-file-earmark-pdf"></i> View Proof (PDF)
+                </a>
+              @endif
+
+              <form action="{{ route('ebook.books.proof.approve', $book) }}" method="POST" class="d-inline">
+                @csrf
+                <button type="submit" class="btn btn-success">
+                  <i class="bi bi-check-lg"></i> Approve Proof
+                </button>
+              </form>
+
+              <button type="button" class="btn btn-outline-warning" data-bs-toggle="collapse" data-bs-target="#proofChangesForm">
+                Request Changes
+              </button>
+
+              <form id="proofChangesForm" class="collapse mt-3" action="{{ route('ebook.books.proof.request-changes', $book) }}" method="POST">
+                @csrf
+                <label class="form-label">What needs to change?</label>
+                <textarea name="proof_change_notes" class="form-control mb-2" rows="3" required></textarea>
+                <button type="submit" class="btn btn-warning">Send Change Request</button>
+              </form>
+            </div>
+          </div>
+        @endif
+
+        {{-- DIGITAL CONTENT MANAGER: Final Publish (author-approved proof only) --}}
+        @if($canProduce && $book->status === 'ready_to_publish')
+          <div class="card mb-4">
+            <div class="card-header"><strong>Ready to Publish</strong></div>
+            <div class="card-body">
+              <p class="text-success"><i class="bi bi-check-circle"></i> The author approved the proof on {{ optional($book->proof_approved_at)->format('M j, Y') }}.</p>
+              <form action="{{ route('ebook.books.publish', $book) }}" method="POST">
+                @csrf
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Access Type *</label>
+                    <select name="access_type" class="form-select" required id="accessType">
+                      @foreach(\App\Models\Book::ACCESS_TYPES as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                      @endforeach
+                    </select>
+                  </div>
+                  <div class="col-md-6" id="embargoField" style="display:none">
+                    <label class="form-label">Embargo Until</label>
+                    <input type="date" name="embargo_until" class="form-control">
                   </div>
                 </div>
                 <button type="submit" class="btn btn-success mt-3">

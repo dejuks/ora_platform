@@ -34,6 +34,9 @@ class Book extends Model
         'access_type',
         'embargo_until',
         'produced_by',
+        'proof_submitted_at',
+        'proof_approved_at',
+        'proof_change_notes',
         'submitted_at',
         'decided_at',
         'published_at',
@@ -51,6 +54,8 @@ class Book extends Model
             'fee_paid_at' => 'datetime',
             'cleared_at' => 'datetime',
             'embargo_until' => 'datetime',
+            'proof_submitted_at' => 'datetime',
+            'proof_approved_at' => 'datetime',
             'processing_fee' => 'decimal:2',
             'waiver_requested' => 'boolean',
         ];
@@ -70,6 +75,8 @@ class Book extends Model
         'rejected' => 'Rejected',
         'financial_clearance' => 'Awaiting Financial Clearance',
         'in_production' => 'In Digital Production',
+        'proof_review' => 'Proof Under Author Review',
+        'ready_to_publish' => 'Ready to Publish',
         'published' => 'Published',
     ];
 
