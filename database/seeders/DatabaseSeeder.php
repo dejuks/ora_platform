@@ -22,6 +22,9 @@ class DatabaseSeeder extends Seeder
             WikiCategorySeeder::class,
             JournalCategorySeeder::class,
             ManuscriptSeeder::class,
+            LibraryCategorySeeder::class,
+            LibraryBookSeeder::class,
+            LibraryDigitalResourceSeeder::class,
         ]);
 
         // Give the "familiar" seeded normal user (johndoe / user@example.com)

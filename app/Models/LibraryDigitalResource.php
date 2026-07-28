@@ -156,7 +156,11 @@ class LibraryDigitalResource extends Model
     public function isAccessibleBy(?User $user): bool
     {
         if (! $user) {
-            return false;
+            // Guest / not logged in — only the most open tier is
+            // reachable, and only once it's actually published.
+            // Matches the Member workflow's "access as guest (if
+            // allowed)".
+            return $this->isPublished() && $this->access_level === 'all_users';
         }
 
         if ($user->isSuperAdmin() || $user->hasModulePermission('library', 'manage-digital-collection')) {
