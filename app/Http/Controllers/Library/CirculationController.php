@@ -8,6 +8,7 @@ use App\Models\LibraryCirculationPolicy;
 use App\Models\LibraryFine;
 use App\Models\LibraryLoan;
 use App\Models\LibraryMember;
+use App\Notifications\AppNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -99,11 +100,18 @@ class CirculationController extends Controller
             ]);
         });
 
+        $member->user?->notify(new AppNotification(
+            title: 'Item checked out',
+            message: "\"{$copy->book->title}\" was checked out to you, due {$loan->due_at->format('M d, Y')}.",
+            url: route('library.members.show', $member),
+            icon: 'bi-journal-arrow-up',
+            type: 'info',
+        ));
+
         return redirect()
             ->route('library.circulation.index')
             ->with('success', "Checked out to {$member->membership_no}, due {$loan->due_at->format('M d, Y')}.");
     }
-
     /**
      * Librarian: check an item back in. Generates a fine
      * automatically if it came back late, and — if someone is
@@ -146,6 +154,16 @@ class CirculationController extends Controller
             ]);
         });
 
+        if ($daysLate > 0) {
+            $loan->member->user?->notify(new AppNotification(
+                title: 'Late fine issued',
+                message: "A fine was recorded for returning \"{$loan->copy->book->title}\" {$daysLate} day(s) late.",
+                url: route('library.fines.index'),
+                icon: 'bi-exclamation-circle',
+                type: 'warning',
+            ));
+        }
+
         return back()->with('success', 'Item checked in.'.($daysLate > 0 ? ' A late fine was recorded.' : ''));
     }
 
@@ -170,6 +188,16 @@ class CirculationController extends Controller
             'due_at' => $loan->due_at->addDays($policy->loan_period_days),
             'renewal_count' => $loan->renewal_count + 1,
         ]);
+
+        if ($isStaff && ! $isOwner) {
+            $loan->member->user?->notify(new AppNotification(
+                title: 'Loan renewed',
+                message: "Your loan for \"{$loan->copy->book->title}\" was renewed. New due date: {$loan->due_at->format('M d, Y')}.",
+                url: route('library.members.show', $loan->library_member_id),
+                icon: 'bi-arrow-clockwise',
+                type: 'info',
+            ));
+        }
 
         return back()->with('success', 'Loan renewed. New due date: '.$loan->due_at->format('M d, Y').'.');
     }

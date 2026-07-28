@@ -73,6 +73,9 @@
                 <span class="badge {{ $book->access_type === 'open_access' ? 'badge-open' : 'badge-restricted' }} mb-3">
                     {{ $book->accessTypeLabel() }}
                 </span>
+                @if($book->category)
+                    <span class="badge bg-light text-dark border mb-3">{{ $book->category->name }}</span>
+                @endif
 
                 <h1 class="h3 mb-3">{{ $book->title }}</h1>
 
