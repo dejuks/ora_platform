@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryDigitalResource;
+use App\Notifications\AppNotification;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +21,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class DigitalResourceController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -196,6 +200,14 @@ class DigitalResourceController extends Controller
             'updated_by' => Auth::id(),
         ]);
 
+        $resource->uploadedBy?->notify(new AppNotification(
+            title: 'Digital resource published',
+            message: "\"{$resource->title}\" has been published to the digital library.",
+            url: route('library.digital-resources.show', $resource),
+            icon: 'bi-check-circle',
+            type: 'success',
+        ));
+
         return back()->with('success', 'Resource published.');
     }
 
@@ -206,6 +218,14 @@ class DigitalResourceController extends Controller
         abort_unless($resource->status === 'published', 422, 'Only published resources can be archived.');
 
         $resource->update(['status' => 'archived', 'updated_by' => Auth::id()]);
+
+        $resource->uploadedBy?->notify(new AppNotification(
+            title: 'Digital resource archived',
+            message: "\"{$resource->title}\" was archived and is no longer visible in the collection.",
+            url: route('library.digital-resources.show', $resource),
+            icon: 'bi-archive',
+            type: 'warning',
+        ));
 
         return back()->with('success', 'Resource archived and hidden from the collection.');
     }
@@ -247,6 +267,14 @@ class DigitalResourceController extends Controller
         abort_unless($resource->file_path, 422, 'Upload a file before submitting this resource for review.');
 
         $resource->update(['status' => 'submitted', 'updated_by' => Auth::id()]);
+
+        $this->notifyPermissionHolders('library', 'manage-digital-collection', new AppNotification(
+            title: 'Digital content submitted for review',
+            message: "\"{$resource->title}\" was submitted by {$user->full_name} and needs review before publishing.",
+            url: route('library.digital-resources.show', $resource),
+            icon: 'bi-file-earmark-text',
+            type: 'info',
+        ));
 
         return back()->with('success', 'Submitted for the Digital Librarian\'s review.');
     }
