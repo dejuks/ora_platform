@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
 use App\Models\LibraryCirculationPolicy;
 use App\Models\LibraryHold;
+use App\Notifications\AppNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +110,14 @@ class HoldController extends Controller
             ]);
         });
 
+        $hold->member->user?->notify(new AppNotification(
+            title: 'Your hold is ready for pickup',
+            message: "\"{$hold->book->title}\" is ready for pickup. Please collect it by {$hold->fresh()->expires_at->format('M j, Y')}.",
+            url: route('library.holds.index'),
+            icon: 'bi-bookmark-check',
+            type: 'success',
+        ));
+
         return back()->with('success', 'Hold marked ready for pickup, copy '.$copy->barcode.' reserved.');
     }
 
@@ -128,6 +137,16 @@ class HoldController extends Controller
 
             $hold->update(['status' => 'cancelled']);
         });
+
+        if (! $isOwner) {
+            $hold->member->user?->notify(new AppNotification(
+                title: 'Hold cancelled',
+                message: "Your hold on \"{$hold->book->title}\" was cancelled by library staff.",
+                url: route('library.holds.index'),
+                icon: 'bi-x-circle',
+                type: 'warning',
+            ));
+        }
 
         return back()->with('success', 'Hold cancelled.');
     }

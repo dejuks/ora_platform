@@ -74,6 +74,9 @@
                 <span class="badge {{ $book->available_copies_count > 0 ? 'badge-available' : 'badge-unavailable' }} mb-3">
                     {{ $book->available_copies_count > 0 ? $book->available_copies_count.' of '.$book->total_copies_count.' copies available' : 'All copies checked out' }}
                 </span>
+                @if($book->category)
+                    <span class="badge bg-light text-dark border mb-3">{{ $book->category->name }}</span>
+                @endif
 
                 <h1 class="h3 mb-3">{{ $book->title }}</h1>
 

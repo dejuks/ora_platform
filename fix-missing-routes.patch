@@ -1,0 +1,203 @@
+diff --git a/routes/web.php b/routes/web.php
+index b77c0e7..4a20296 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -3,6 +3,8 @@
+ use App\Http\Controllers\Account\ActivityLogController;
+ use App\Http\Controllers\Account\ProfileController as AccountProfileController;
+ use App\Http\Controllers\Account\SettingsController as AccountSettingsController;
++use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageController;
++use App\Http\Controllers\Admin\JournalCategoryController as AdminJournalCategoryController;
+ use App\Http\Controllers\Admin\ModuleController;
+ use App\Http\Controllers\Admin\PermissionController;
+ use App\Http\Controllers\Admin\RoleController;
+@@ -17,15 +19,20 @@
+ use App\Http\Controllers\DashboardController;
+ use App\Http\Controllers\JoinController;
+ use App\Http\Controllers\NotificationController;
++use App\Http\Controllers\ArticleController as JournalArticleController;
++use App\Http\Controllers\ModuleEnrollmentController;
+ use App\Http\Controllers\PortalController;
+ use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
+ use App\Http\Controllers\Ebook\BookController as EbookBookController;
+ use App\Http\Controllers\Ebook\DashboardController as EbookDashboardController;
++use App\Http\Controllers\Ebook\MyLibraryController as EbookMyLibraryController;
++use App\Http\Controllers\Ebook\OrderController as EbookOrderController;
+ use App\Http\Controllers\Ebook\PaymentController as EbookPaymentController;
+ use App\Http\Controllers\Ebook\PublicController as EbookPublicController;
+ use App\Http\Controllers\Ebook\SettingsController as EbookSettingsController;
+ use App\Http\Controllers\Ebook\UserController as EbookUserController;
+ use App\Http\Controllers\Journal\DashboardController as JournalDashboardController;
++use App\Http\Controllers\Journal\CategoryController as JournalCategoryController;
+ use App\Http\Controllers\Journal\ManuscriptController as JournalManuscriptController;
+ use App\Http\Controllers\Journal\SettingsController as JournalSettingsController;
+ use App\Http\Controllers\Journal\UserController as JournalUserController;
+@@ -37,6 +44,7 @@
+ use App\Http\Controllers\Library\FineController as LibraryFineController;
+ use App\Http\Controllers\Library\HoldController as LibraryHoldController;
+ use App\Http\Controllers\Library\MemberController as LibraryMemberController;
++use App\Http\Controllers\Library\PublicController as LibraryPublicController;
+ use App\Http\Controllers\Library\UserController as LibraryUserController;
+ use App\Http\Controllers\Repository\DashboardController as RepositoryDashboardController;
+ use App\Http\Controllers\Repository\PublicController as RepositoryPublicController;
+@@ -132,6 +140,24 @@
+         Route::get('/{manuscript}', [JournalPublicController::class, 'show'])->name('show');
+     });
+ 
++// A separate, self-contained Article/category browsing view
++// (resources/views/journal/articles/*) with its own controller and
++// A-Z/category filters — distinct from the manuscript-based portal
++// above. Controller and views already existed but were never wired
++// to a route (previously sitting in routes/journal-routes-to-merge.php,
++// which was never actually merged into web.php). Mounted at a
++// different path than 'journal/articles' above to avoid colliding
++// with the manuscript portal's URIs, while keeping the route *names*
++// ('journal.articles.*') that the views/nav snippet already expect.
++Route::prefix('journal/browse-articles')
++    ->as('journal.articles.')
++    ->group(function () {
++
++        Route::get('/', [JournalArticleController::class, 'index'])->name('index');
++
++        Route::get('/{article}', [JournalArticleController::class, 'show'])->name('show');
++    });
++
+ /*
+ |--------------------------------------------------------------------------
+ | PUBLIC EBOOK PORTAL (open to everyone — no login required)
+@@ -194,6 +220,34 @@
+ Route::get('repository/items/{item}/download', [RepositoryItemController::class, 'download'])
+     ->name('repository.items.download');
+ 
++/*
++|--------------------------------------------------------------------------
++| PUBLIC LIBRARY PORTAL (open to everyone — no login required)
++|--------------------------------------------------------------------------
++|
++| The physical library's catalog is browsable by anyone, logged in or
++| not — same reasoning as the Journal/Ebook/Repository public portals
++| above. Reserving a title (see the 'library.public.reserve' route
++| further down, inside the top-level 'auth' group) does require an
++| account, since it auto-enrolls the visitor as a Library member.
++|
++| Deliberately prefixed 'library/catalog' rather than bare 'library' —
++| the authenticated management group below also uses the 'library'
++| prefix (library/books, library/members, ...), and a bare 'library/
++| {book}' here would greedily swallow those paths since this group is
++| registered first.
++|
++*/
++
++Route::prefix('library/catalog')
++    ->as('library.public.')
++    ->group(function () {
++
++        Route::get('/', [LibraryPublicController::class, 'index'])->name('index');
++
++        Route::get('/{book}', [LibraryPublicController::class, 'show'])->name('show');
++    });
++
+ /*
+ |--------------------------------------------------------------------------
+ | CHAPA WEBHOOK (server-to-server, no session/auth, CSRF-exempt)
+@@ -211,6 +265,14 @@
+ Route::post('ebook/payments/chapa/webhook', [EbookPaymentController::class, 'webhook'])
+     ->name('ebook.payments.chapa.webhook');
+ 
++// Distinct from the webhook above: that one settles the Book
++// Processing Charge an Author pays to get published; this one
++// settles a reader's purchase of an already-published title (see
++// Ebook\OrderController). Already CSRF-exempted in bootstrap/app.php
++// but the route itself was never registered.
++Route::post('ebook/orders/chapa/webhook', [EbookOrderController::class, 'webhook'])
++    ->name('ebook.orders.chapa.webhook');
++
+ /*
+ |--------------------------------------------------------------------------
+ | GUEST ROUTES (not logged in users)
+@@ -388,6 +450,29 @@
+ 
+             Route::put('settings', [SystemSettingController::class, 'update'])
+                 ->name('settings.update');
++
++            // Controller and views already existed but were never wired
++            // to a route (previously sitting in routes/journal-routes-
++            // to-merge.php, which was never actually merged into web.php).
++            Route::resource('journal-categories', AdminJournalCategoryController::class)
++                ->except('show');
++
++            // Contact messages submitted via the public Wiki portal.
++            // Controller and views already existed but were never wired
++            // to a route (previously sitting in routes/wiki-admin.php,
++            // which was never actually merged into web.php — that
++            // file's separate article-CRUD block is a stale duplicate
++            // of the wiki.articles.* routes already wired below, and
++            // references a App\Http\Controllers\Admin\ArticleController
++            // class that doesn't exist, so it's intentionally left out).
++            Route::prefix('wiki/contact-messages')
++                ->as('wiki.contact-messages.')
++                ->group(function () {
++
++                    Route::get('/', [AdminContactMessageController::class, 'index'])->name('index');
++                    Route::get('{contactMessage}', [AdminContactMessageController::class, 'show'])->name('show');
++                    Route::delete('{contactMessage}', [AdminContactMessageController::class, 'destroy'])->name('destroy');
++                });
+         });
+ 
+     /*
+@@ -496,6 +581,12 @@
+ 
+             Route::put('settings', [JournalSettingsController::class, 'update'])
+                 ->name('settings.update');
++
++            // Journal Manager: configure the fixed list of categories an
++            // Author picks from when submitting a manuscript, and that
++            // visitors filter the public article listing by. Controller
++            // and views already existed but were never wired to a route.
++            Route::resource('categories', JournalCategoryController::class)->except('show');
+         });
+ 
+     /*
+@@ -635,6 +726,42 @@
+     Route::post('ebook/become-author', [EbookAuthorEnrollmentController::class, 'enroll'])
+         ->name('ebook.become-author');
+ 
++    // Any logged-in ORA user can reserve a physical library title with
++    // no copy currently on the shelf — auto-enrolls them as a Library
++    // member on the spot if needed (see Library\PublicController::
++    // reserve()). Deliberately OUTSIDE module.access:library below,
++    // same reasoning as ebook.become-author above.
++    Route::post('library/catalog/{book}/reserve', [LibraryPublicController::class, 'reserve'])
++        ->name('library.public.reserve');
++
++    // Digital Bookstore checkout — any logged-in ORA user can buy a
++    // 'for_sale' title, no ebook module membership required (see
++    // Ebook\OrderController). Controller and views already existed
++    // but were never wired to a route.
++    Route::prefix('ebook/books/{book}/checkout')
++        ->as('ebook.books.checkout')
++        ->group(function () {
++
++            Route::get('/', [EbookOrderController::class, 'show'])->name('');
++            Route::post('/', [EbookOrderController::class, 'store'])->name('.process');
++            Route::get('/return', [EbookOrderController::class, 'returnFromChapa'])->name('.return');
++        });
++
++    // "My Digital Library" — every eBook a reader has purchased, with
++    // a re-download link. Not gated by module.access:ebook — buying a
++    // book doesn't require joining the module. Controller and view
++    // already existed but were never wired to a route.
++    Route::get('ebook/my-library', [EbookMyLibraryController::class, 'index'])
++        ->name('ebook.my-library');
++
++    // "My Modules" — lets an already-registered user see what they're
++    // enrolled in and self-join additional modules later. Controller
++    // and view already existed but were never wired to a route.
++    Route::get('my-modules', [ModuleEnrollmentController::class, 'index'])
++        ->name('my-modules');
++    Route::post('my-modules/{moduleCode}/join', [ModuleEnrollmentController::class, 'join'])
++        ->name('my-modules.join');
++
+     /*
+     |--------------------------------------------------------------------------
+     | EBOOK PUBLISHING — the book workflow

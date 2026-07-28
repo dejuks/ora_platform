@@ -79,6 +79,9 @@
               <dt class="col-sm-4">Subject</dt>
               <dd class="col-sm-8">{{ $book->subject ?? '—' }}</dd>
 
+              <dt class="col-sm-4">Category</dt>
+              <dd class="col-sm-8">{{ $book->category->name ?? '—' }}</dd>
+
               <dt class="col-sm-4">Cataloged By</dt>
               <dd class="col-sm-8">{{ $book->catalogedBy->full_name ?? '—' }}</dd>
 

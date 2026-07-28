@@ -14,6 +14,7 @@ class Book extends Model
         'abstract',
         'keywords',
         'author_id',
+        'category_id',
         'editor_id',
         'status',
         'manuscript_file',
@@ -93,6 +94,11 @@ class Book extends Model
     public function author()
     {
         return $this->belongsTo(User::class, 'author_id');
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(BookCategory::class, 'category_id');
     }
 
     public function editor()
@@ -344,5 +350,18 @@ class Book extends Model
         return $query->published()
             ->where('access_type', 'for_sale')
             ->where('is_purchasable', true);
+    }
+
+    public function scopeInCategory($query, string $categorySlug)
+    {
+        return $query->whereHas('category', fn ($q) => $q->where('slug', $categorySlug));
+    }
+
+    /**
+     * A-Z filter: titles starting with the given letter (case-insensitive).
+     */
+    public function scopeTitleStartsWith($query, string $letter)
+    {
+        return $query->where('title', 'like', $letter.'%');
     }
 }

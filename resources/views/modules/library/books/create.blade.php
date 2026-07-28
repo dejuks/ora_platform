@@ -63,6 +63,18 @@
             <input type="text" name="subject" class="form-control" value="{{ old('subject') }}">
           </div>
 
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select name="category_id" class="form-select">
+              <option value="">— Select a category —</option>
+              @foreach($categories as $category)
+                <option value="{{ $category->id }}" {{ old('category_id') == $category->id ? 'selected' : '' }}>
+                  {{ $category->name }}
+                </option>
+              @endforeach
+            </select>
+          </div>
+
           <div class="col-12">
             <label class="form-label">Description</label>
             <textarea name="description" class="form-control" rows="4">{{ old('description') }}</textarea>

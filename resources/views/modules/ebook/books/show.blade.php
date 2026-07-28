@@ -48,6 +48,9 @@
           <div class="card-header"><strong>Abstract</strong></div>
           <div class="card-body">
             <p>{{ $book->abstract }}</p>
+            @if($book->category)
+              <p class="text-muted mb-0"><strong>Category:</strong> {{ $book->category->name }}</p>
+            @endif
             @if($book->keywords)
               <p class="text-muted mb-0"><strong>Keywords:</strong> {{ $book->keywords }}</p>
             @endif

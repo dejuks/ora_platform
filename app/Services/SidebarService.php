@@ -104,6 +104,10 @@ class SidebarService
             // not just its admin.
             if ($module->code === 'journal' && Route::has('journal.manuscripts.index')) {
                 $children[] = ['title' => 'Manuscripts', 'icon' => 'bi-file-earmark-text', 'route' => 'journal.manuscripts.index'];
+
+                if ($user->hasModulePermission('journal', 'manage-categories') && Route::has('journal.categories.index')) {
+                    $children[] = ['title' => 'Categories', 'icon' => 'bi-tags', 'route' => 'journal.categories.index'];
+                }
             }
 
             // Ebook Publishing's own feature: visible to any member,
@@ -111,6 +115,10 @@ class SidebarService
             if ($module->code === 'ebook' && Route::has('ebook.books.index')) {
                 $children[] = ['title' => 'Books', 'icon' => 'bi-book', 'route' => 'ebook.books.index'];
                 $children[] = ['title' => 'Digital Library', 'icon' => 'bi-globe', 'route' => 'ebook.public.index'];
+
+                if ($user->hasModulePermission('ebook', 'manage-categories') && Route::has('ebook.categories.index')) {
+                    $children[] = ['title' => 'Categories', 'icon' => 'bi-tags', 'route' => 'ebook.categories.index'];
+                }
             }
 
             // Repository Management's own feature: visible to any
@@ -172,6 +180,10 @@ class SidebarService
 
                 if ($user->hasModulePermission('library', 'manage-circulation-policy')) {
                     $children[] = ['title' => 'Circulation Policy', 'icon' => 'bi-sliders', 'route' => 'library.policy.edit'];
+                }
+
+                if ($user->hasModulePermission('library', 'manage-categories') && Route::has('library.categories.index')) {
+                    $children[] = ['title' => 'Categories', 'icon' => 'bi-tags', 'route' => 'library.categories.index'];
                 }
             }
 

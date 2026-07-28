@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Ebook;
 
 use App\Http\Controllers\Controller;
 use App\Models\Book;
+use App\Models\BookCategory;
 use App\Models\BookReview;
 use App\Models\EbookSetting;
 use App\Models\User;
@@ -51,7 +52,9 @@ class BookController extends Controller
 
     public function create()
     {
-        return view('modules.ebook.books.create');
+        $categories = BookCategory::active()->ordered()->get();
+
+        return view('modules.ebook.books.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -60,6 +63,7 @@ class BookController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:ebook_categories,id'],
             'manuscript_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
@@ -80,7 +84,7 @@ class BookController extends Controller
     {
         $this->authorizeView($book);
 
-        $book->load(['author', 'editor', 'decidedBy', 'clearedBy', 'producedBy', 'reviews.reviewer']);
+        $book->load(['author', 'category', 'editor', 'decidedBy', 'clearedBy', 'producedBy', 'reviews.reviewer']);
 
         $reviewers = $this->isEditorial(Auth::user())
             ? User::whereHas('moduleRoles', function ($q) {
@@ -212,7 +216,9 @@ class BookController extends Controller
     {
         $this->authorizeAuthorEdit($book);
 
-        return view('modules.ebook.books.edit', compact('book'));
+        $categories = BookCategory::active()->ordered()->get();
+
+        return view('modules.ebook.books.edit', compact('book', 'categories'));
     }
 
     /**
@@ -233,6 +239,7 @@ class BookController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'abstract' => ['required', 'string'],
             'keywords' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:ebook_categories,id'],
             'manuscript_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
@@ -254,6 +261,7 @@ class BookController extends Controller
                 'title' => $data['title'],
                 'abstract' => $data['abstract'],
                 'keywords' => $data['keywords'] ?? null,
+                'category_id' => $data['category_id'] ?? $book->category_id,
                 'manuscript_file' => $data['manuscript_file'] ?? $book->manuscript_file,
                 'status' => $newStatus,
                 'submitted_at' => now(),
