@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Library;
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
 use App\Models\LibraryBookCopy;
+use App\Models\LibraryCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -69,7 +70,9 @@ class BookController extends Controller
     {
         $this->authorizePermission('catalog-items');
 
-        return view('modules.library.books.create');
+        $categories = LibraryCategory::active()->ordered()->get();
+
+        return view('modules.library.books.create', compact('categories'));
     }
 
     public function store(Request $request)
@@ -85,6 +88,7 @@ class BookController extends Controller
             'edition' => ['nullable', 'string', 'max:64'],
             'call_number' => ['nullable', 'string', 'max:64'],
             'subject' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:library_categories,id'],
             'description' => ['nullable', 'string'],
         ]);
 
@@ -101,7 +105,7 @@ class BookController extends Controller
 
     public function show(LibraryBook $book)
     {
-        $book->load(['catalogedBy', 'approvedBy', 'copies', 'holds.member.user']);
+        $book->load(['catalogedBy', 'approvedBy', 'category', 'copies', 'holds.member.user']);
 
         return view('modules.library.books.show', compact('book'));
     }
@@ -110,7 +114,9 @@ class BookController extends Controller
     {
         $this->authorizePermission('catalog-items');
 
-        return view('modules.library.books.edit', compact('book'));
+        $categories = LibraryCategory::active()->ordered()->get();
+
+        return view('modules.library.books.edit', compact('book', 'categories'));
     }
 
     public function update(Request $request, LibraryBook $book)
@@ -126,6 +132,7 @@ class BookController extends Controller
             'edition' => ['nullable', 'string', 'max:64'],
             'call_number' => ['nullable', 'string', 'max:64'],
             'subject' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'exists:library_categories,id'],
             'description' => ['nullable', 'string'],
         ]);
 

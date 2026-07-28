@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
+use App\Models\LibraryCategory;
 use App\Models\LibraryHold;
 use App\Services\ModuleEnrollmentService;
 use Illuminate\Http\Request;
@@ -20,17 +21,6 @@ use Illuminate\Support\Facades\Auth;
  * AuthorEnrollmentController). Checkout and return of the physical
  * copy still happen in person at the circulation desk — see
  * Library\CirculationController, untouched by this portal.
- *
- * Supports the same query-string filters as Journal's public portal,
- * combinable:
- *   ?q=climate            free-text search (title/author/subject/ISBN)
- *   ?subject=Fiction      filter by subject (the catalog's stand-in
- *                         for Journal's category — books don't have a
- *                         dedicated category table, just a free-text
- *                         'subject' field, so the sidebar groups on
- *                         that instead)
- *   ?letter=B             A-Z filter, first letter of the title
- *   ?sort=az|za|latest    default: az
  */
 class PublicController extends Controller
 {
@@ -45,21 +35,25 @@ class PublicController extends Controller
                 'copies as available_copies_count' => fn ($q) => $q->where('status', 'available'),
                 'copies as total_copies_count',
             ])
-            ->when($request->filled('q'), function ($query) use ($request) {
-                $term = $request->string('q');
-                $query->where(function ($q) use ($term) {
-                    $q->where('title', 'like', "%{$term}%")
-                        ->orWhere('author', 'like', "%{$term}%")
-                        ->orWhere('subject', 'like', "%{$term}%")
-                        ->orWhere('isbn', 'like', "%{$term}%");
-                });
-            })
-            ->when($request->filled('subject'), function ($query) use ($request) {
-                $query->where('subject', $request->string('subject'));
-            })
-            ->when($request->filled('letter') && $request->get('letter') !== 'ALL', function ($query) use ($request) {
-                $query->where('title', 'like', strtoupper($request->string('letter')).'%');
+            ->with('category');
+
+        if ($request->filled('q')) {
+            $term = $request->string('q');
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', "%{$term}%")
+                    ->orWhere('author', 'like', "%{$term}%")
+                    ->orWhere('subject', 'like', "%{$term}%")
+                    ->orWhere('isbn', 'like', "%{$term}%");
             });
+        }
+
+        if ($request->filled('category')) {
+            $query->inCategory($request->string('category'));
+        }
+
+        if ($request->filled('letter') && $request->get('letter') !== 'ALL') {
+            $query->titleStartsWith(strtoupper($request->string('letter')));
+        }
 
         $sort = $request->get('sort', 'az');
         match ($sort) {
@@ -70,21 +64,14 @@ class PublicController extends Controller
 
         $books = $query->paginate(12)->withQueryString();
 
-        // Subject sidebar — the catalog's stand-in for Journal's
-        // category list. Grouped from the free-text 'subject' column
-        // rather than a dedicated table, so this only surfaces
-        // subjects that are actually in use, each with its own count.
-        $subjects = LibraryBook::active()
-            ->whereNotNull('subject')
-            ->where('subject', '!=', '')
-            ->selectRaw('subject, count(*) as books_count')
-            ->groupBy('subject')
-            ->orderBy('subject')
+        $categories = LibraryCategory::active()
+            ->withCount(['books' => fn ($q) => $q->active()])
+            ->ordered()
             ->get();
 
         $letters = range('A', 'Z');
 
-        return view('modules.library.public.index', compact('books', 'subjects', 'letters'));
+        return view('modules.library.public.index', compact('books', 'categories', 'letters'));
     }
 
     public function show(LibraryBook $book)
@@ -95,6 +82,8 @@ class PublicController extends Controller
             'copies as available_copies_count' => fn ($q) => $q->where('status', 'available'),
             'copies as total_copies_count',
         ]);
+
+        $book->load('category');
 
         $member = Auth::user()?->libraryMember;
 

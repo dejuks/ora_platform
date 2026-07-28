@@ -3,27 +3,24 @@
 use App\Http\Controllers\Account\ActivityLogController;
 use App\Http\Controllers\Account\ProfileController as AccountProfileController;
 use App\Http\Controllers\Account\SettingsController as AccountSettingsController;
-use App\Http\Controllers\Admin\ContactMessageController as AdminContactMessageController;
-use App\Http\Controllers\Admin\JournalCategoryController as AdminJournalCategoryController;
 use App\Http\Controllers\Admin\ModuleController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SystemSettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Journal\PaymentController as JournalPaymentController;
 use App\Http\Controllers\Journal\PublicController as JournalPublicController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\JoinController;
-use App\Http\Controllers\NotificationController;
-use App\Http\Controllers\ArticleController as JournalArticleController;
 use App\Http\Controllers\ModuleEnrollmentController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\Ebook\AuthorEnrollmentController as EbookAuthorEnrollmentController;
 use App\Http\Controllers\Ebook\BookController as EbookBookController;
+use App\Http\Controllers\Ebook\CategoryController as EbookCategoryController;
 use App\Http\Controllers\Ebook\DashboardController as EbookDashboardController;
 use App\Http\Controllers\Ebook\MyLibraryController as EbookMyLibraryController;
 use App\Http\Controllers\Ebook\OrderController as EbookOrderController;
@@ -31,12 +28,13 @@ use App\Http\Controllers\Ebook\PaymentController as EbookPaymentController;
 use App\Http\Controllers\Ebook\PublicController as EbookPublicController;
 use App\Http\Controllers\Ebook\SettingsController as EbookSettingsController;
 use App\Http\Controllers\Ebook\UserController as EbookUserController;
-use App\Http\Controllers\Journal\DashboardController as JournalDashboardController;
 use App\Http\Controllers\Journal\CategoryController as JournalCategoryController;
+use App\Http\Controllers\Journal\DashboardController as JournalDashboardController;
 use App\Http\Controllers\Journal\ManuscriptController as JournalManuscriptController;
 use App\Http\Controllers\Journal\SettingsController as JournalSettingsController;
 use App\Http\Controllers\Journal\UserController as JournalUserController;
 use App\Http\Controllers\Library\BookController as LibraryBookController;
+use App\Http\Controllers\Library\CategoryController as LibraryCategoryController;
 use App\Http\Controllers\Library\CirculationController as LibraryCirculationController;
 use App\Http\Controllers\Library\CirculationPolicyController as LibraryCirculationPolicyController;
 use App\Http\Controllers\Library\DashboardController as LibraryDashboardController;
@@ -57,16 +55,9 @@ use App\Http\Controllers\Researcher\GroupController as ResearcherGroupController
 use App\Http\Controllers\Researcher\GroupPostController as ResearcherGroupPostController;
 use App\Http\Controllers\Researcher\MessageController as ResearcherMessageController;
 use App\Http\Controllers\Researcher\ProfileController as ResearcherProfileController;
-use App\Http\Controllers\Researcher\RegisterController as ResearcherRegisterController;
 use App\Http\Controllers\Researcher\UserController as ResearcherUserController;
-use App\Http\Controllers\Wiki\ArticleController as WikiArticleController;
-use App\Http\Controllers\Wiki\ArticleEditRequestController as WikiArticleEditRequestController;
-use App\Http\Controllers\Wiki\BlockController as WikiBlockController;
-use App\Http\Controllers\Wiki\CategoryController as WikiCategoryController;
 use App\Http\Controllers\Wiki\DashboardController as WikiDashboardController;
-use App\Http\Controllers\Wiki\DeletionDiscussionController as WikiDeletionDiscussionController;
 use App\Http\Controllers\Wiki\PublicController as WikiPublicController;
-use App\Http\Controllers\Wiki\RevisionController as WikiRevisionController;
 use App\Http\Controllers\Wiki\UserController as WikiUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -109,11 +100,6 @@ Route::prefix('wiki/articles')
 
         Route::get('/random', [WikiPublicController::class, 'random'])->name('random');
 
-        // Literal path before the wildcard article show route below,
-        // same reasoning as the manage/articles group — otherwise
-        // 'category' would be swallowed as an article slug.
-        Route::get('/category/{category:slug}', [WikiPublicController::class, 'category'])->name('category');
-
         Route::get('/{article}', [WikiPublicController::class, 'show'])->name('show');
     });
 
@@ -138,24 +124,6 @@ Route::prefix('journal/articles')
         Route::get('/', [JournalPublicController::class, 'index'])->name('index');
 
         Route::get('/{manuscript}', [JournalPublicController::class, 'show'])->name('show');
-    });
-
-// A separate, self-contained Article/category browsing view
-// (resources/views/journal/articles/*) with its own controller and
-// A-Z/category filters — distinct from the manuscript-based portal
-// above. Controller and views already existed but were never wired
-// to a route (previously sitting in routes/journal-routes-to-merge.php,
-// which was never actually merged into web.php). Mounted at a
-// different path than 'journal/articles' above to avoid colliding
-// with the manuscript portal's URIs, while keeping the route *names*
-// ('journal.articles.*') that the views/nav snippet already expect.
-Route::prefix('journal/browse-articles')
-    ->as('journal.articles.')
-    ->group(function () {
-
-        Route::get('/', [JournalArticleController::class, 'index'])->name('index');
-
-        Route::get('/{article}', [JournalArticleController::class, 'show'])->name('show');
     });
 
 /*
@@ -187,6 +155,72 @@ Route::prefix('ebook/library')
 // (open/restricted/embargoed).
 Route::get('ebook/books/{book}/download', [EbookBookController::class, 'download'])
     ->name('ebook.books.download');
+
+/*
+|--------------------------------------------------------------------------
+| DIGITAL BOOKSTORE (buy a "for sale" eBook — any logged-in visitor)
+|--------------------------------------------------------------------------
+|
+| A title the Digital Content Manager has marked access_type =
+| 'for_sale' isn't free to download like Open/Restricted/Embargoed —
+| the reader pays via Chapa first. Browsing (index/show above) stays
+| fully public; only starting checkout and re-downloading a title you
+| already own require being logged in. Buying doesn't require joining
+| the Ebook module (that's for authors) — any ORA account can be a
+| customer, which is why this sits outside module.access:ebook.
+|
+*/
+
+Route::middleware('auth')->group(function () {
+
+    Route::get('ebook/books/{book}/checkout', [EbookOrderController::class, 'show'])
+        ->name('ebook.books.checkout');
+
+    Route::post('ebook/books/{book}/checkout', [EbookOrderController::class, 'store'])
+        ->name('ebook.books.checkout.process');
+
+    Route::get('ebook/books/{book}/checkout/return', [EbookOrderController::class, 'returnFromChapa'])
+        ->name('ebook.books.checkout.return');
+
+    // "My Digital Library" — every eBook this reader has purchased,
+    // with a re-download link that never expires.
+    Route::get('my/ebooks', [EbookMyLibraryController::class, 'index'])
+        ->name('ebook.my-library');
+});
+
+Route::post('ebook/orders/chapa/webhook', [EbookOrderController::class, 'webhook'])
+    ->name('ebook.orders.chapa.webhook');
+
+/*
+|--------------------------------------------------------------------------
+| PUBLIC LIBRARY PORTAL (open to everyone — no login required)
+|--------------------------------------------------------------------------
+|
+| The physical catalog is discoverable by anyone, same reasoning as
+| the Journal/Ebook/Repository public portals above — a visitor can
+| search the shelves before ever creating an account. Reserving a
+| title is self-service (Member workflow: "place holds/reservations")
+| but still requires being a Library member, so reserve() enrolls the
+| logged-in visitor into Library on the spot (same one-click pattern
+| as My Modules / AuthorEnrollmentController) rather than sending them
+| off to a separate sign-up step. Actual checkout/return of the copy
+| still happens in person at the circulation desk — see
+| Library\CirculationController, unchanged.
+|
+*/
+
+Route::prefix('library/catalog')
+    ->as('library.public.')
+    ->group(function () {
+
+        Route::get('/', [LibraryPublicController::class, 'index'])->name('index');
+
+        Route::get('/{book}', [LibraryPublicController::class, 'show'])->name('show');
+
+        Route::post('/{book}/reserve', [LibraryPublicController::class, 'reserve'])
+            ->middleware('auth')
+            ->name('reserve');
+    });
 
 /*
 |--------------------------------------------------------------------------
@@ -222,34 +256,6 @@ Route::get('repository/items/{item}/download', [RepositoryItemController::class,
 
 /*
 |--------------------------------------------------------------------------
-| PUBLIC LIBRARY PORTAL (open to everyone — no login required)
-|--------------------------------------------------------------------------
-|
-| The physical library's catalog is browsable by anyone, logged in or
-| not — same reasoning as the Journal/Ebook/Repository public portals
-| above. Reserving a title (see the 'library.public.reserve' route
-| further down, inside the top-level 'auth' group) does require an
-| account, since it auto-enrolls the visitor as a Library member.
-|
-| Deliberately prefixed 'library/catalog' rather than bare 'library' —
-| the authenticated management group below also uses the 'library'
-| prefix (library/books, library/members, ...), and a bare 'library/
-| {book}' here would greedily swallow those paths since this group is
-| registered first.
-|
-*/
-
-Route::prefix('library/catalog')
-    ->as('library.public.')
-    ->group(function () {
-
-        Route::get('/', [LibraryPublicController::class, 'index'])->name('index');
-
-        Route::get('/{book}', [LibraryPublicController::class, 'show'])->name('show');
-    });
-
-/*
-|--------------------------------------------------------------------------
 | CHAPA WEBHOOK (server-to-server, no session/auth, CSRF-exempt)
 |--------------------------------------------------------------------------
 |
@@ -264,14 +270,6 @@ Route::post('journal/payments/chapa/webhook', [JournalPaymentController::class, 
 
 Route::post('ebook/payments/chapa/webhook', [EbookPaymentController::class, 'webhook'])
     ->name('ebook.payments.chapa.webhook');
-
-// Distinct from the webhook above: that one settles the Book
-// Processing Charge an Author pays to get published; this one
-// settles a reader's purchase of an already-published title (see
-// Ebook\OrderController). Already CSRF-exempted in bootstrap/app.php
-// but the route itself was never registered.
-Route::post('ebook/orders/chapa/webhook', [EbookOrderController::class, 'webhook'])
-    ->name('ebook.orders.chapa.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -289,33 +287,22 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login'])
         ->name('login.post');
 
-    // Public self-registration — any visitor can create their own
-    // Author account and start submitting manuscripts right away.
+    // Public self-registration — one account for the whole platform.
+    // The visitor checks which modules to join (Journal, Ebook,
+    // Library, Researcher Network, Wiki, Repository) and is enrolled
+    // into each immediately with that module's entry-level role —
+    // this is also how a reader becomes an eBook customer or a
+    // Library member able to buy/download/reserve titles below.
     Route::get('/register', [RegisterController::class, 'showRegister'])
         ->name('register');
 
     Route::post('/register', [RegisterController::class, 'register'])
         ->name('register.post');
 
-    // Public self-registration — any visitor can create their own
-    // account and be enrolled straight into the Researchers'
-    // Network as a Member, separate from the Journal-branded
-    // /register page above.
-    Route::get('/researcher/register', [ResearcherRegisterController::class, 'showRegister'])
+    // Old Researcher-branded signup URL — redirect straight to the
+    // unified form so any bookmarked/shared links still work.
+    Route::redirect('/researcher/register', '/register')
         ->name('researcher.register');
-
-    Route::post('/researcher/register', [ResearcherRegisterController::class, 'register'])
-        ->name('researcher.register.post');
-
-    // Public self-registration — any visitor can create their own
-    // account and be enrolled straight into the Researchers'
-    // Network as a Member, separate from the Journal-branded
-    // /register page above.
-    Route::get('/researcher/register', [ResearcherRegisterController::class, 'showRegister'])
-        ->name('researcher.register');
-
-    Route::post('/researcher/register', [ResearcherRegisterController::class, 'register'])
-        ->name('researcher.register.post');
 });
 
 /*
@@ -326,38 +313,29 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware('auth')->group(function () {
 
-    // Deliberately NOT behind 'verified' — an unverified user still
-    // needs a way off the "verify your email" holding page.
     Route::post('/logout', [AuthController::class, 'logout'])
         ->name('logout');
-
-    Route::get('/email/verify', [EmailVerificationController::class, 'notice'])
-        ->name('verification.notice');
-
-    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-        ->middleware('signed')
-        ->name('verification.verify');
-
-    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
-        ->middleware('throttle:6,1')
-        ->name('verification.send');
-});
-
-Route::middleware(['auth', 'verified'])->group(function () {
 
     // Smart dashboard: sends Super Admin to the control panel, sends a
     // module admin/member to their module, otherwise a no-access page.
     Route::get('/dashboard', [DashboardController::class, 'index'])
         ->name('dashboard');
 
+    // "My Modules" — self-service page to see what you're enrolled in
+    // and join any additional self-registerable module later, without
+    // going through Super Admin. This is how someone who registered
+    // just to buy an eBook can add Library membership afterwards (or
+    // vice-versa) with one click.
+    Route::get('/my-modules', [ModuleEnrollmentController::class, 'index'])
+        ->name('my-modules');
+
+    Route::post('/my-modules/{moduleCode}', [ModuleEnrollmentController::class, 'join'])
+        ->name('my-modules.join');
+
     /*
     |--------------------------------------------------------------------------
-    | ACCOUNT — My Profile, Settings, Activity Log
+    | ACCOUNT — "My Profile" menu (profile, settings, activity log)
     |--------------------------------------------------------------------------
-    |
-    | Available to every logged-in user regardless of module, via the
-    | account dropdown in the top-right of the header.
-    |
     */
 
     Route::prefix('account')
@@ -450,29 +428,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::put('settings', [SystemSettingController::class, 'update'])
                 ->name('settings.update');
-
-            // Controller and views already existed but were never wired
-            // to a route (previously sitting in routes/journal-routes-
-            // to-merge.php, which was never actually merged into web.php).
-            Route::resource('journal-categories', AdminJournalCategoryController::class)
-                ->except('show');
-
-            // Contact messages submitted via the public Wiki portal.
-            // Controller and views already existed but were never wired
-            // to a route (previously sitting in routes/wiki-admin.php,
-            // which was never actually merged into web.php — that
-            // file's separate article-CRUD block is a stale duplicate
-            // of the wiki.articles.* routes already wired below, and
-            // references a App\Http\Controllers\Admin\ArticleController
-            // class that doesn't exist, so it's intentionally left out).
-            Route::prefix('wiki/contact-messages')
-                ->as('wiki.contact-messages.')
-                ->group(function () {
-
-                    Route::get('/', [AdminContactMessageController::class, 'index'])->name('index');
-                    Route::get('{contactMessage}', [AdminContactMessageController::class, 'show'])->name('show');
-                    Route::delete('{contactMessage}', [AdminContactMessageController::class, 'destroy'])->name('destroy');
-                });
         });
 
     /*
@@ -542,6 +497,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::resource('manuscripts', JournalManuscriptController::class)->except('destroy');
 
+            Route::resource('categories', JournalCategoryController::class)->except('show');
+
             Route::post('manuscripts/{manuscript}/screen', [JournalManuscriptController::class, 'screen'])
                 ->name('manuscripts.screen');
 
@@ -581,143 +538,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::put('settings', [JournalSettingsController::class, 'update'])
                 ->name('settings.update');
-
-            // Journal Manager: configure the fixed list of categories an
-            // Author picks from when submitting a manuscript, and that
-            // visitors filter the public article listing by. Controller
-            // and views already existed but were never wired to a route.
-            Route::resource('categories', JournalCategoryController::class)->except('show');
-        });
-
-    /*
-    |--------------------------------------------------------------------------
-    | OROMO WIKIPEDIA — the editing workflow
-    |--------------------------------------------------------------------------
-    |
-    | Registered Editor creates/edits an article (edit-articles) -> any
-    | member can nominate it for deletion / weigh in on that discussion
-    | -> Administrator (Sysop) protects/deletes/restores pages and
-    | blocks disruptive users (moderate-content) -> Oversighter
-    | suppresses revisions containing private data (suppress-revisions).
-    | Controllers and views already existed but were never wired to a
-    | route — added here to match the Journal/Ebook/Library pattern.
-    |
-    */
-
-    Route::prefix('wiki')
-        ->as('wiki.')
-        ->middleware('module.access:wiki')
-        ->group(function () {
-
-            // NOTE: path is 'wiki/manage/articles', not 'wiki/articles' —
-            // the latter is already taken by the public wiki portal
-            // above (registered outside auth) and would otherwise
-            // shadow every route in this group. Route *names* still
-            // read as wiki.articles.* to match the views/controllers.
-            Route::prefix('manage/articles')
-                ->as('articles.')
-                ->group(function () {
-
-                    Route::get('/', [WikiArticleController::class, 'index'])->name('index');
-
-                    // Literal 'edit-requests' must come before the '{article}'
-                    // wildcard show route below for the same reason 'create'
-                    // does — otherwise it gets swallowed as an article ID.
-                    Route::get('edit-requests', [WikiArticleEditRequestController::class, 'index'])
-                        ->name('edit-requests.index');
-
-                    // A blocked user/IP can still browse the wiki (same as
-                    // Wikipedia) but every action that creates, edits, or
-                    // otherwise changes content is gated behind an active-
-                    // block check.
-                    //
-                    // NOTE: literal segments ('create') must be registered
-                    // before the wildcard '{article}' routes below, or
-                    // Laravel matches '{article}' first and tries to
-                    // route-model-bind the literal string "create" as an
-                    // article ID.
-                    Route::middleware('wiki.not_blocked')->group(function () {
-                        Route::get('create', [WikiArticleController::class, 'create'])->name('create');
-                        Route::post('/', [WikiArticleController::class, 'store'])->name('store');
-                    });
-
-                    Route::get('{article}', [WikiArticleController::class, 'show'])->name('show');
-
-                    Route::middleware('wiki.not_blocked')->group(function () {
-                        Route::get('{article}/edit', [WikiArticleController::class, 'edit'])->name('edit');
-                        Route::put('{article}', [WikiArticleController::class, 'update'])->name('update');
-
-                        // Owner-approval editing workflow: anyone can ask,
-                        // only the owner (or a Sysop/Bureaucrat) decides.
-                        Route::post('{article}/edit-requests', [WikiArticleEditRequestController::class, 'store'])
-                            ->name('edit-requests.store');
-                        Route::post('{article}/edit-requests/{editRequest}/approve', [WikiArticleEditRequestController::class, 'approve'])
-                            ->name('edit-requests.approve');
-                        Route::post('{article}/edit-requests/{editRequest}/reject', [WikiArticleEditRequestController::class, 'reject'])
-                            ->name('edit-requests.reject');
-
-                        // Administrator (Sysop) — the protect/restore forms
-                        // submit plain POST (no @method spoofing), hence POST here.
-                        Route::post('{article}/protect', [WikiArticleController::class, 'protect'])->name('protect');
-                        Route::delete('{article}', [WikiArticleController::class, 'destroy'])->name('destroy');
-                        Route::post('{article}/restore', [WikiArticleController::class, 'restore'])
-                            ->withTrashed()->name('restore');
-
-                        // Nominate this article for deletion (Articles for Deletion)
-                        Route::post('{article}/deletions', [WikiDeletionDiscussionController::class, 'store'])
-                            ->name('deletions.store');
-                    });
-                });
-
-            Route::prefix('deletions')
-                ->as('deletions.')
-                ->group(function () {
-
-                    Route::get('/', [WikiDeletionDiscussionController::class, 'index'])->name('index');
-                    Route::get('{discussion}', [WikiDeletionDiscussionController::class, 'show'])->name('show');
-
-                    Route::middleware('wiki.not_blocked')->group(function () {
-                        Route::post('{discussion}/comment', [WikiDeletionDiscussionController::class, 'comment'])->name('comment');
-
-                        // Administrator (Sysop)
-                        Route::post('{discussion}/close', [WikiDeletionDiscussionController::class, 'close'])->name('close');
-                    });
-                });
-
-            // Administrator (Sysop) / Bureaucrat: configure categories
-            Route::prefix('categories')
-                ->as('categories.')
-                ->middleware('wiki.not_blocked')
-                ->group(function () {
-
-                    Route::get('/', [WikiCategoryController::class, 'index'])->name('index');
-                    Route::get('create', [WikiCategoryController::class, 'create'])->name('create');
-                    Route::post('/', [WikiCategoryController::class, 'store'])->name('store');
-                    Route::get('{category}/edit', [WikiCategoryController::class, 'edit'])->name('edit');
-                    Route::put('{category}', [WikiCategoryController::class, 'update'])->name('update');
-                    Route::delete('{category}', [WikiCategoryController::class, 'destroy'])->name('destroy');
-                });
-
-            // Administrator (Sysop): block disruptive users/IPs
-            Route::prefix('blocks')
-                ->as('blocks.')
-                ->group(function () {
-
-                    Route::get('/', [WikiBlockController::class, 'index'])->name('index');
-                    Route::get('create', [WikiBlockController::class, 'create'])->name('create');
-                    Route::post('/', [WikiBlockController::class, 'store'])->name('store');
-                    Route::post('{block}/lift', [WikiBlockController::class, 'lift'])->name('lift');
-                });
-
-            // Oversighter/CheckUser: suppress revisions containing private data
-            Route::prefix('revisions')
-                ->as('revisions.')
-                ->group(function () {
-
-                    Route::get('/', [WikiRevisionController::class, 'index'])->name('index');
-                    Route::post('{revision}/suppress', [WikiRevisionController::class, 'suppress'])->name('suppress');
-                    Route::post('{revision}/unsuppress', [WikiRevisionController::class, 'unsuppress'])->name('unsuppress');
-                });
         });
 
     // Any logged-in ORA user can self-enroll as an eBook Author —
@@ -725,42 +545,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // must be able to request ebook access before they have it.
     Route::post('ebook/become-author', [EbookAuthorEnrollmentController::class, 'enroll'])
         ->name('ebook.become-author');
-
-    // Any logged-in ORA user can reserve a physical library title with
-    // no copy currently on the shelf — auto-enrolls them as a Library
-    // member on the spot if needed (see Library\PublicController::
-    // reserve()). Deliberately OUTSIDE module.access:library below,
-    // same reasoning as ebook.become-author above.
-    Route::post('library/catalog/{book}/reserve', [LibraryPublicController::class, 'reserve'])
-        ->name('library.public.reserve');
-
-    // Digital Bookstore checkout — any logged-in ORA user can buy a
-    // 'for_sale' title, no ebook module membership required (see
-    // Ebook\OrderController). Controller and views already existed
-    // but were never wired to a route.
-    Route::prefix('ebook/books/{book}/checkout')
-        ->as('ebook.books.checkout')
-        ->group(function () {
-
-            Route::get('/', [EbookOrderController::class, 'show'])->name('');
-            Route::post('/', [EbookOrderController::class, 'store'])->name('.process');
-            Route::get('/return', [EbookOrderController::class, 'returnFromChapa'])->name('.return');
-        });
-
-    // "My Digital Library" — every eBook a reader has purchased, with
-    // a re-download link. Not gated by module.access:ebook — buying a
-    // book doesn't require joining the module. Controller and view
-    // already existed but were never wired to a route.
-    Route::get('ebook/my-library', [EbookMyLibraryController::class, 'index'])
-        ->name('ebook.my-library');
-
-    // "My Modules" — lets an already-registered user see what they're
-    // enrolled in and self-join additional modules later. Controller
-    // and view already existed but were never wired to a route.
-    Route::get('my-modules', [ModuleEnrollmentController::class, 'index'])
-        ->name('my-modules');
-    Route::post('my-modules/{moduleCode}/join', [ModuleEnrollmentController::class, 'join'])
-        ->name('my-modules.join');
 
     /*
     |--------------------------------------------------------------------------
@@ -782,6 +566,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::resource('books', EbookBookController::class)
                 ->only(['index', 'create', 'store', 'show', 'edit', 'update']);
+
+            Route::resource('categories', EbookCategoryController::class)->except('show');
 
             Route::post('books/{book}/screen', [EbookBookController::class, 'screen'])
                 ->name('books.screen');
@@ -814,20 +600,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('books/{book}/clear', [EbookBookController::class, 'clear'])
                 ->name('books.clear');
 
-            // Digital Content Manager: convert + assign ISBN/DOI,
-            // then send the proof to the author for approval.
-            Route::post('books/{book}/proof', [EbookBookController::class, 'uploadProof'])
-                ->name('books.proof.upload');
-
-            // Author: approve the proof, or send it back with notes.
-            Route::post('books/{book}/proof/approve', [EbookBookController::class, 'approveProof'])
-                ->name('books.proof.approve');
-
-            Route::post('books/{book}/proof/request-changes', [EbookBookController::class, 'requestProofChanges'])
-                ->name('books.proof.request-changes');
-
-            // Digital Content Manager: set access rights and go live —
-            // only reachable once the author has approved the proof.
+            // Digital Content Manager: convert + assign ISBN/DOI +
+            // set access rights + publish.
             Route::post('books/{book}/publish', [EbookBookController::class, 'publish'])
                 ->name('books.publish');
 
@@ -904,6 +678,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->group(function () {
 
             Route::resource('books', LibraryBookController::class)->except('destroy');
+
+            Route::resource('categories', LibraryCategoryController::class)->except('show');
 
             Route::get('copies', [LibraryBookController::class, 'copiesIndex'])->name('copies.index');
 
@@ -1016,4 +792,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::resource('announcements', ResearcherAnnouncementController::class);
             Route::post('announcements/{announcement}/publish', [ResearcherAnnouncementController::class, 'publish'])->name('announcements.publish');
         });
+
 });

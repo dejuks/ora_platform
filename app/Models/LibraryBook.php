@@ -18,6 +18,7 @@ class LibraryBook extends Model
         'edition',
         'call_number',
         'subject',
+        'category_id',
         'description',
         'status',
         'cataloged_by',
@@ -50,6 +51,11 @@ class LibraryBook extends Model
     public function copies()
     {
         return $this->hasMany(LibraryBookCopy::class);
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(LibraryCategory::class, 'category_id');
     }
 
     public function holds()
@@ -102,5 +108,18 @@ class LibraryBook extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    public function scopeInCategory($query, string $categorySlug)
+    {
+        return $query->whereHas('category', fn ($q) => $q->where('slug', $categorySlug));
+    }
+
+    /**
+     * A-Z filter: titles starting with the given letter (case-insensitive).
+     */
+    public function scopeTitleStartsWith($query, string $letter)
+    {
+        return $query->where('title', 'like', $letter.'%');
     }
 }

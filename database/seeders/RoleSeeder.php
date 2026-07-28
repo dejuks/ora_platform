@@ -68,7 +68,7 @@ class RoleSeeder extends Seeder
                 'slug' => 'book-editor',
                 'description' => 'Oversees the entire book publishing workflow: screens manuscripts, assigns peer reviewers, makes editorial decisions, communicates with authors.',
                 'is_admin_role' => true,
-                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'screen-manuscripts', 'assign-peer-reviewers', 'make-editorial-decision'],
+                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'screen-manuscripts', 'assign-peer-reviewers', 'make-editorial-decision', 'manage-categories'],
             ],
             [
                 'name' => 'Peer Reviewer',
@@ -109,7 +109,7 @@ class RoleSeeder extends Seeder
                 'slug' => 'library-manager',
                 'description' => 'Oversees all library operations, staff, and policies for digital and physical collections; approves acquisitions; generates usage reports.',
                 'is_admin_role' => true,
-                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions'],
+                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions', 'manage-categories'],
             ],
             [
                 'name' => 'Digital Librarian',

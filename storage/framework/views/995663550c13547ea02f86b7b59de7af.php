@@ -4,7 +4,6 @@
 <head>
     <meta charset="UTF-8">
     <title>ORA Library Catalog</title>
-
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <link href="<?php echo e(asset('vendors/bootstrap/css/bootstrap.min.css')); ?>" rel="stylesheet">
@@ -48,7 +47,7 @@
         .az-bar a:hover { border-color: #350f22; color: #350f22; }
         .az-bar a.is-active { background: #350f22; border-color: #350f22; color: #fff; }
 
-        /* Subject sidebar (library's stand-in for Journal's category list) */
+        /* Category sidebar */
         .cat-list { list-style: none; padding: 0; margin: 0 0 24px; }
         .cat-list li { margin-bottom: 4px; }
         .cat-list a {
@@ -74,23 +73,21 @@
             margin: 0 0 10px;
         }
 
-        .book-card {
-            background: #fff;
-            border: 1px solid #e6e0d5;
-            border-radius: 14px;
-            padding: 22px;
-            height: 100%;
-            transition: 0.2s;
-        }
-        .book-card:hover {
-            box-shadow: 0 10px 25px rgba(0,0,0,0.06);
-            transform: translateY(-2px);
-        }
-        .book-title { font-weight: 700; color: #201510; text-decoration: none; }
-        .book-title:hover { color: #350f22; }
-        .badge-available { background: #dcfce7; color: #166534; font-weight: 600; }
-        .badge-unavailable { background: #fef3c7; color: #92400e; font-weight: 600; }
-        .badge-subject { background: #f4efe6; color: #350f22; font-weight: 600; }
+        .book-card { background: #fff; border: 1px solid #e6e0d5; border-radius: 14px; overflow: hidden; height: 100%; transition: 0.2s; }
+        .book-card:hover { box-shadow: 0 10px 25px rgba(0,0,0,0.06); transform: translateY(-2px); }
+
+        .book-cover { height: 150px; background: #f4efe6; display: flex; align-items: center; justify-content: center; color: #94897d; font-size: 40px; }
+
+        .book-card-body { padding: 18px; }
+        .book-card-body h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+        .book-card-body h3 a { color: #201510; text-decoration: none; }
+        .book-card-body h3 a:hover { color: #350f22; }
+
+        .book-meta { font-size: 13px; color: #6b625c; margin-bottom: 10px; }
+
+        .badge-available { background: #dcfce7; color: #166534; }
+        .badge-unavailable { background: #fef3c7; color: #92400e; }
+        .badge-category { background: #f4efe6; color: #350f22; font-weight: 600; }
 
         .site-footer { text-align: center; color: #94a3b8; font-size: 13px; padding: 30px 0; }
     </style>
@@ -102,19 +99,16 @@
 
     <div class="container hero">
         <h1 class="h3">Browse the Shelves</h1>
-        <p class="text-muted">
-            Search the Association's physical collection. Reserve a title online, then pick it up in person —
-            no need to already be a member, we'll sign you up when you reserve.
-        </p>
+        <p class="text-muted">Search the Association's physical collection. Reserve a title online, then pick it up in person — no need to already be a member, we'll sign you up when you reserve.</p>
 
         <form method="GET" action="<?php echo e(route('library.public.index')); ?>" class="search-box mb-2">
             
-            <input type="hidden" name="subject" value="<?php echo e(request('subject')); ?>">
+            <input type="hidden" name="category" value="<?php echo e(request('category')); ?>">
             <input type="hidden" name="letter" value="<?php echo e(request('letter')); ?>">
             <input type="hidden" name="sort" value="<?php echo e(request('sort')); ?>">
             <div class="input-group">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
-                <input type="text" name="q" class="form-control" placeholder="Search by title, author, subject, or ISBN"
+                <input type="text" name="q" class="form-control" placeholder="Search by title, author, subject, or ISBN…"
                        value="<?php echo e(request('q')); ?>">
                 <button class="btn btn-primary" type="submit">Search</button>
             </div>
@@ -146,20 +140,20 @@
         <div class="row g-4">
             
             <aside class="col-md-3">
-                <p class="sidebar-heading">Subject</p>
+                <p class="sidebar-heading">Category</p>
                 <ul class="cat-list">
                     <li>
-                        <a href="<?php echo e(request()->fullUrlWithQuery(['subject' => null])); ?>"
-                           class="<?php echo e(!request('subject') ? 'is-active' : ''); ?>">
-                            <span>All subjects</span>
+                        <a href="<?php echo e(request()->fullUrlWithQuery(['category' => null])); ?>"
+                           class="<?php echo e(!request('category') ? 'is-active' : ''); ?>">
+                            <span>All categories</span>
                         </a>
                     </li>
-                    <?php $__currentLoopData = $subjects; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $subject): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php $__currentLoopData = $categories; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $category): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <li>
-                            <a href="<?php echo e(request()->fullUrlWithQuery(['subject' => $subject->subject])); ?>"
-                               class="<?php echo e(request('subject') === $subject->subject ? 'is-active' : ''); ?>">
-                                <span><?php echo e($subject->subject); ?></span>
-                                <span class="count"><?php echo e($subject->books_count); ?></span>
+                            <a href="<?php echo e(request()->fullUrlWithQuery(['category' => $category->slug])); ?>"
+                               class="<?php echo e(request('category') === $category->slug ? 'is-active' : ''); ?>">
+                                <span><?php echo e($category->name); ?></span>
+                                <span class="count"><?php echo e($category->books_count); ?></span>
                             </a>
                         </li>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
@@ -167,7 +161,7 @@
 
                 <p class="sidebar-heading">Sort</p>
                 <ul class="cat-list">
-                    <?php $__currentLoopData = ['az' => 'Title A–Z', 'za' => 'Title Z–A', 'latest' => 'Recently added']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                    <?php $__currentLoopData = ['az' => 'Title A–Z', 'za' => 'Title Z–A', 'latest' => 'Newest first']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                         <li>
                             <a href="<?php echo e(request()->fullUrlWithQuery(['sort' => $key])); ?>"
                                class="<?php echo e(request('sort', 'az') === $key ? 'is-active' : ''); ?>">
@@ -182,30 +176,28 @@
             <section class="col-md-9">
                 <div class="row g-4">
                     <?php $__empty_1 = true; $__currentLoopData = $books; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $book): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <div class="col-md-4">
+                        <div class="col-md-6 col-lg-4">
                             <div class="book-card">
-                                <div class="mb-2">
-                                    <span class="badge <?php echo e($book->available_copies_count > 0 ? 'badge-available' : 'badge-unavailable'); ?>">
+                                <div class="book-cover">
+                                    <i class="bi bi-journal-bookmark"></i>
+                                </div>
+                                <div class="book-card-body">
+                                    <span class="badge <?php echo e($book->available_copies_count > 0 ? 'badge-available' : 'badge-unavailable'); ?> mb-2">
                                         <?php echo e($book->available_copies_count > 0 ? $book->available_copies_count.' available' : 'All copies checked out'); ?>
 
                                     </span>
-                                    <?php if($book->subject): ?>
-                                        <span class="badge badge-subject"><?php echo e($book->subject); ?></span>
+                                    <?php if($book->category): ?>
+                                        <span class="badge badge-category mb-2"><?php echo e($book->category->name); ?></span>
                                     <?php endif; ?>
-                                </div>
-                                <div>
-                                    <a href="<?php echo e(route('library.public.show', $book)); ?>" class="book-title">
-                                        <?php echo e($book->title); ?>
-
+                                    <h3><a href="<?php echo e(route('library.public.show', $book)); ?>"><?php echo e($book->title); ?></a></h3>
+                                    <div class="book-meta">
+                                        <?php if($book->author): ?> By <?php echo e($book->author); ?> <?php endif; ?>
+                                        <?php if($book->publication_year): ?> · <?php echo e($book->publication_year); ?> <?php endif; ?>
+                                    </div>
+                                    <a href="<?php echo e(route('library.public.show', $book)); ?>" class="btn btn-sm btn-outline-primary mt-2">
+                                        View Details
                                     </a>
                                 </div>
-                                <p class="text-muted small mt-2 mb-3">
-                                    <?php if($book->author): ?> By <?php echo e($book->author); ?> <?php endif; ?>
-                                    <?php if($book->publication_year): ?> · <?php echo e($book->publication_year); ?> <?php endif; ?>
-                                </p>
-                                <a href="<?php echo e(route('library.public.show', $book)); ?>" class="small">
-                                    View details <i class="bi bi-arrow-right"></i>
-                                </a>
                             </div>
                         </div>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
