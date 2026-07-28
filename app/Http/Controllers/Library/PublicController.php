@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Library;
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
 use App\Models\LibraryCategory;
+use App\Models\LibraryDigitalResource;
 use App\Models\LibraryHold;
 use App\Services\ModuleEnrollmentService;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The physical Library's public portal. Anyone can search and browse
@@ -140,5 +143,85 @@ class PublicController extends Controller
         ]);
 
         return back()->with('success', 'Reserved. We will notify you when a copy is ready for pickup — bring your membership number to the circulation desk.');
+    }
+
+    /**
+     * The Digital Library's public portal — same reasoning as the
+     * physical catalog above: anyone can search and browse, logged
+     * in or not. What actually shows up (and downloads) still
+     * depends on access_level via LibraryDigitalResource::isAccessibleBy():
+     * 'all_users' is open to guests, 'members_only' needs an active
+     * library membership, 'staff_only' never appears here at all.
+     */
+    public function digital(Request $request)
+    {
+        $user = Auth::user();
+
+        $query = LibraryDigitalResource::where('status', 'published');
+
+        if ($request->filled('q')) {
+            $term = $request->string('q');
+            $query->where(function ($q) use ($term) {
+                $q->where('title', 'like', "%{$term}%")
+                    ->orWhere('author', 'like', "%{$term}%")
+                    ->orWhere('subject', 'like', "%{$term}%")
+                    ->orWhere('keywords', 'like', "%{$term}%");
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->where('resource_type', $request->string('type'));
+        }
+
+        $query->orderBy('title');
+
+        // Guests and non-members only ever see what they could
+        // actually open — no dead links to an access tier they can't
+        // reach. isAccessibleBy() already encodes all_users /
+        // members_only / staff_only correctly for both guests and
+        // logged-in users.
+        $resources = $query->get()
+            ->filter(fn (LibraryDigitalResource $resource) => $resource->isAccessibleBy($user))
+            ->values();
+
+        // Simple manual pagination — the collection is already
+        // filtered in memory above, so a query-level paginate() would
+        // undercount pages.
+        $page = max(1, (int) $request->get('page', 1));
+        $perPage = 12;
+        $paged = new LengthAwarePaginator(
+            $resources->forPage($page, $perPage),
+            $resources->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('modules.library.public.digital-index', [
+            'resources' => $paged,
+            'resourceTypes' => LibraryDigitalResource::RESOURCE_TYPES,
+        ]);
+    }
+
+    public function digitalShow(LibraryDigitalResource $resource)
+    {
+        abort_unless($resource->isAccessibleBy(Auth::user()), 403, 'You do not have access to this resource. It may require a library membership.');
+
+        if ($resource->isPublished()) {
+            $resource->increment('views_count');
+        }
+
+        return view('modules.library.public.digital-show', compact('resource'));
+    }
+
+    public function digitalDownload(LibraryDigitalResource $resource)
+    {
+        abort_unless($resource->isAccessibleBy(Auth::user()), 403, 'You do not have access to this resource. It may require a library membership.');
+
+        abort_unless($resource->file_path, 404, 'No file available for this resource.');
+
+        $resource->increment('downloads_count');
+
+        return Storage::disk('public')->download($resource->file_path, $resource->file_original_name ?: $resource->title);
     }
 }

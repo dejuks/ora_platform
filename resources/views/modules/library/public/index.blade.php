@@ -101,6 +101,15 @@
         <h1 class="h3">Browse the Shelves</h1>
         <p class="text-muted">Search the Association's physical collection. Reserve a title online, then pick it up in person — no need to already be a member, we'll sign you up when you reserve.</p>
 
+        <div class="mb-3">
+            <a href="{{ route('library.public.index') }}" class="btn btn-sm btn-dark me-2">
+                <i class="bi bi-journal-bookmark"></i> Physical Catalog
+            </a>
+            <a href="{{ route('library.public.digital.index') }}" class="btn btn-sm btn-outline-dark">
+                <i class="bi bi-cloud-arrow-down"></i> Digital Library
+            </a>
+        </div>
+
         <form method="GET" action="{{ route('library.public.index') }}" class="search-box mb-2">
             {{-- Preserve the active filters when a new search term is submitted --}}
             <input type="hidden" name="category" value="{{ request('category') }}">

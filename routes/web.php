@@ -215,6 +215,13 @@ Route::prefix('library/catalog')
 
         Route::get('/', [LibraryPublicController::class, 'index'])->name('index');
 
+        Route::get('/digital', [LibraryPublicController::class, 'digital'])->name('digital.index');
+
+        Route::get('/digital/{resource}', [LibraryPublicController::class, 'digitalShow'])->name('digital.show');
+
+        Route::get('/digital/{resource}/download', [LibraryPublicController::class, 'digitalDownload'])
+            ->name('digital.download');
+
         Route::get('/{book}', [LibraryPublicController::class, 'show'])->name('show');
 
         Route::post('/{book}/reserve', [LibraryPublicController::class, 'reserve'])

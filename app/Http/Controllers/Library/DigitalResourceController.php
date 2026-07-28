@@ -241,7 +241,7 @@ class DigitalResourceController extends Controller
 
         abort_unless($resource->file_path, 404, 'No file available for this resource.');
 
-        if (! Auth::user()->hasModulePermission('library', 'manage-digital-collection')) {
+        if (! Auth::user()?->hasModulePermission('library', 'manage-digital-collection')) {
             $resource->increment('downloads_count');
         }
 
