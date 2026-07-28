@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryFine;
+use App\Notifications\AppNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -53,6 +54,14 @@ class FineController extends Controller
             'paid_at' => now(),
         ]);
 
+        $fine->member->user?->notify(new AppNotification(
+            title: 'Fine payment received',
+            message: "Your fine of {$fine->amount} for \"{$fine->loan->copy->book->title}\" was marked as paid.",
+            url: route('library.fines.index'),
+            icon: 'bi-receipt',
+            type: 'success',
+        ));
+
         return back()->with('success', 'Fine marked as paid.');
     }
 
@@ -71,6 +80,14 @@ class FineController extends Controller
             'waived_by' => Auth::id(),
             'waiver_reason' => $data['waiver_reason'],
         ]);
+
+        $fine->member->user?->notify(new AppNotification(
+            title: 'Fine waived',
+            message: "Your fine of {$fine->amount} for \"{$fine->loan->copy->book->title}\" was waived.",
+            url: route('library.fines.index'),
+            icon: 'bi-check-circle',
+            type: 'success',
+        ));
 
         return back()->with('success', 'Fine waived.');
     }

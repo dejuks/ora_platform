@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
 use App\Models\LibraryBookCopy;
 use App\Models\LibraryCategory;
+use App\Notifications\AppNotification;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -23,6 +25,8 @@ use Illuminate\Support\Str;
  */
 class BookController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -98,6 +102,14 @@ class BookController extends Controller
 
         $book = LibraryBook::create($data);
 
+        $this->notifyPermissionHolders('library', 'approve-acquisitions', new AppNotification(
+            title: 'New title pending acquisition',
+            message: "\"{$book->title}\" was cataloged by {$book->catalogedBy->full_name} and is awaiting acquisition approval.",
+            url: route('library.books.show', $book),
+            icon: 'bi-journal-plus',
+            type: 'info',
+        ), excludeUserId: Auth::id());
+
         return redirect()
             ->route('library.books.show', $book)
             ->with('success', 'Title cataloged. Awaiting Library Manager approval before it enters circulation.');
@@ -166,6 +178,14 @@ class BookController extends Controller
         $book->copies()
             ->where('status', 'pending_acquisition')
             ->update(['status' => 'available', 'updated_by' => Auth::id()]);
+
+        $book->catalogedBy?->notify(new AppNotification(
+            title: 'Acquisition approved',
+            message: "\"{$book->title}\" was approved and is now active in the catalog.",
+            url: route('library.books.show', $book),
+            icon: 'bi-check-circle',
+            type: 'success',
+        ));
 
         return back()->with('success', 'Acquisition approved. Title and its copies are now active.');
     }
