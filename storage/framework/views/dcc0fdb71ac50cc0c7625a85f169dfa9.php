@@ -43,6 +43,12 @@
       <div class="alert alert-danger"><?php echo e($errors->first()); ?></div>
     <?php endif; ?>
 
+    <div class="card mb-4">
+      <div class="card-body">
+        <?php echo $__env->make('modules.ebook.books._workflow-steps', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+      </div>
+    </div>
+
     <div class="row g-4">
 
       <div class="col-lg-8">
@@ -51,6 +57,9 @@
           <div class="card-header"><strong>Abstract</strong></div>
           <div class="card-body">
             <p><?php echo e($book->abstract); ?></p>
+            <?php if($book->category): ?>
+              <p class="text-muted mb-0"><strong>Category:</strong> <?php echo e($book->category->name); ?></p>
+            <?php endif; ?>
             <?php if($book->keywords): ?>
               <p class="text-muted mb-0"><strong>Keywords:</strong> <?php echo e($book->keywords); ?></p>
             <?php endif; ?>
