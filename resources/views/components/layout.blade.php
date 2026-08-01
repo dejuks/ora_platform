@@ -169,6 +169,9 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
             </span>
           </button>
           <ul class="dropdown-menu dropdown-menu-end">
+              <li></li>
+              <li></li>
+              <li></li>
             <li class="dropdown-header">
               <img src="{{ $headerAvatar }}" alt="User">
               <h6>{{ $headerUser->full_name ?? 'Guest' }}</h6>
@@ -179,6 +182,12 @@ href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.m
                 <i class="bi bi-person"></i> My Profile
               </a>
             </li>
+              <li>
+                  <a class="dropdown-item" href="{{ url('/my-modules') }}">
+                      <i class="bi bi-person"></i> My Modules
+                  </a>
+              </li>
+
             <li>
               <a class="dropdown-item" href="{{ route('account.settings.edit') }}">
                 <i class="bi bi-gear"></i> Settings
