@@ -17,6 +17,7 @@ class LibraryDigitalResource extends Model
         'subject',
         'keywords',
         'access_level',
+        'pricing_plan_id',
         'status',
         'file_path',
         'file_original_name',
@@ -76,6 +77,16 @@ class LibraryDigitalResource extends Model
         return $this->belongsTo(User::class, 'published_by');
     }
 
+    public function pricingPlan()
+    {
+        return $this->belongsTo(LibraryPricingPlan::class, 'pricing_plan_id');
+    }
+
+    public function purchases()
+    {
+        return $this->hasMany(LibraryResourcePurchase::class, 'library_digital_resource_id');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Helpers
@@ -128,6 +139,41 @@ class LibraryDigitalResource extends Model
             && in_array($this->status, ['draft', 'submitted'], true);
     }
 
+    /**
+     * Whether opening/downloading this resource requires paying its
+     * assigned pricing plan first. A resource with no plan, or an
+     * inactive/free (zero amount) plan, is free.
+     */
+    public function requiresPayment(): bool
+    {
+        return $this->pricing_plan_id !== null
+            && $this->pricingPlan
+            && $this->pricingPlan->is_active
+            && $this->pricingPlan->amount > 0;
+    }
+
+    public function price(): ?float
+    {
+        return $this->requiresPayment() ? (float) $this->pricingPlan->amount : null;
+    }
+
+    public function currency(): string
+    {
+        return $this->pricingPlan?->currency ?? 'ETB';
+    }
+
+    public function isPurchasedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        return $this->purchases()
+            ->where('user_id', $user->id)
+            ->where('status', 'completed')
+            ->exists();
+    }
+
     public function formattedFileSize(): ?string
     {
         if (! $this->file_size) {
@@ -159,7 +205,8 @@ class LibraryDigitalResource extends Model
             // Guest / not logged in — only the most open tier is
             // reachable, and only once it's actually published.
             // Matches the Member workflow's "access as guest (if
-            // allowed)".
+            // allowed)". Viewing the summary page is fine even for a
+            // priced resource — see canDownload() for the payment gate.
             return $this->isPublished() && $this->access_level === 'all_users';
         }
 
@@ -180,6 +227,22 @@ class LibraryDigitalResource extends Model
             'staff_only' => $this->isLibraryStaff($user),
             default => true, // all_users — module access alone is enough
         };
+    }
+
+    /**
+     * The actual "open the file" gate: everything isAccessibleBy()
+     * already checks (access tier), plus — for a priced resource —
+     * a completed purchase from this user. Staff/owners short-circuit
+     * true inside isAccessibleBy() itself, so they never need to buy
+     * their own upload.
+     */
+    public function canDownload(?User $user): bool
+    {
+        if (! $this->isAccessibleBy($user)) {
+            return false;
+        }
+
+        return ! $this->requiresPayment() || $this->isPurchasedBy($user);
     }
 
     protected function isLibraryStaff(User $user): bool

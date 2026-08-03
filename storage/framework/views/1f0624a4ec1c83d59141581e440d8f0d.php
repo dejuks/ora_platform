@@ -30,13 +30,26 @@
 
         </span>
         <span class="badge bg-info text-dark"><?php echo e($resource->accessLevelLabel()); ?></span>
+        <?php if($resource->requiresPayment()): ?>
+          <span class="badge bg-warning text-dark">
+            <i class="bi bi-cash-coin"></i> <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->price(), 2)); ?>
+
+          </span>
+        <?php endif; ?>
       </div>
 
       <div class="d-flex gap-2">
         <?php if($resource->file_path): ?>
-          <a href="<?php echo e(route('library.digital-resources.download', $resource)); ?>" class="btn btn-primary">
-            <i class="bi bi-download"></i> Download
-          </a>
+          <?php if($resource->requiresPayment() && ! $canManage && ! $resource->isPurchasedBy($user)): ?>
+            <a href="<?php echo e(route('library.public.digital.purchase', $resource)); ?>" class="btn btn-warning">
+              <i class="bi bi-cash-coin"></i> Buy Access — <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->price(), 2)); ?>
+
+            </a>
+          <?php else: ?>
+            <a href="<?php echo e(route('library.digital-resources.download', $resource)); ?>" class="btn btn-primary">
+              <i class="bi bi-download"></i> Download
+            </a>
+          <?php endif; ?>
         <?php endif; ?>
 
         <?php if($resource->canBeEditedBy($user)): ?>
@@ -99,6 +112,17 @@
               </dd>
 
               <?php if($canManage): ?>
+                <dt class="col-sm-3">Pricing Plan</dt>
+                <dd class="col-sm-9">
+                  <?php if($resource->pricingPlan): ?>
+                    <?php echo e($resource->pricingPlan->name); ?> — <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->pricingPlan->amount, 2)); ?>
+
+                    <?php if (! ($resource->pricingPlan->is_active)): ?> <span class="badge bg-secondary">Inactive</span> <?php endif; ?>
+                  <?php else: ?>
+                    Free
+                  <?php endif; ?>
+                </dd>
+
                 <dt class="col-sm-3">Uploaded By</dt>
                 <dd class="col-sm-9"><?php echo e($resource->uploadedBy->full_name ?? '—'); ?></dd>
 

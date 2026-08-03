@@ -75,6 +75,32 @@
       </div>
 
       <div class="card mb-4">
+        <div class="card-header">Pricing</div>
+        <div class="card-body">
+          <label class="form-label">Charge for access?</label>
+          <select name="pricing_plan_id" class="form-select" id="pricingPlanSelect">
+            <option value="">Free — no charge</option>
+            @foreach($pricingPlans as $plan)
+              <option value="{{ $plan->id }}"
+                data-resource-type="{{ $plan->resource_type }}"
+                {{ old('pricing_plan_id', $resource->pricing_plan_id) == $plan->id ? 'selected' : '' }}>
+                {{ $plan->name }} — {{ $plan->currency }} {{ number_format($plan->amount, 2) }}
+                @if($plan->resource_type) ({{ \App\Models\LibraryPricingPlan::RESOURCE_TYPES[$plan->resource_type] ?? $plan->resource_type }} only) @endif
+              </option>
+            @endforeach
+          </select>
+          @if($resource->pricing_plan_id && ! $pricingPlans->contains('id', $resource->pricing_plan_id))
+            <div class="form-text text-warning">
+              The currently assigned plan is inactive or was deleted. Saving without picking a new one makes this resource free.
+            </div>
+          @endif
+          <div class="form-text">
+            Plans are managed under <a href="{{ route('library.pricing-plans.index') }}">Pricing Plans</a>.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
         <div class="card-header">File</div>
         <div class="card-body row g-3">
           <div class="col-12">
@@ -102,5 +128,27 @@
     </form>
 
   </div>
+
+  <script>
+    (function () {
+      var typeSelect = document.querySelector('select[name="resource_type"]');
+      var planSelect = document.getElementById('pricingPlanSelect');
+      if (!typeSelect || !planSelect) return;
+
+      function filterPlans() {
+        var type = typeSelect.value;
+        Array.from(planSelect.options).forEach(function (opt) {
+          var scoped = opt.dataset ? opt.dataset.resourceType : '';
+          if (!opt.value) return;
+          var mismatched = scoped && scoped !== type;
+          opt.hidden = mismatched;
+          if (mismatched && opt.selected) planSelect.value = '';
+        });
+      }
+
+      typeSelect.addEventListener('change', filterPlans);
+      filterPlans();
+    })();
+  </script>
 
 </x-layout>

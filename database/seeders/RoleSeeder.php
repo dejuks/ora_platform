@@ -109,7 +109,7 @@ class RoleSeeder extends Seeder
                 'slug' => 'library-manager',
                 'description' => 'Oversees all library operations, staff, and policies for digital and physical collections; approves acquisitions; generates usage reports.',
                 'is_admin_role' => true,
-                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions', 'manage-categories'],
+                'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions', 'manage-categories', 'manage-payments'],
             ],
             [
                 'name' => 'Digital Librarian',

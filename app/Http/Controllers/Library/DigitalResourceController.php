@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryDigitalResource;
+use App\Models\LibraryPricingPlan;
 use App\Notifications\AppNotification;
 use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
@@ -78,7 +79,9 @@ class DigitalResourceController extends Controller
     {
         $this->authorizeUploadAccess();
 
-        return view('modules.library.digital-resources.create');
+        $pricingPlans = LibraryPricingPlan::active()->orderBy('name')->get();
+
+        return view('modules.library.digital-resources.create', compact('pricingPlans'));
     }
 
     public function store(Request $request)
@@ -93,6 +96,7 @@ class DigitalResourceController extends Controller
             'subject' => ['nullable', 'string', 'max:255'],
             'keywords' => ['nullable', 'string', 'max:255'],
             'access_level' => ['required', 'in:all_users,members_only,staff_only'],
+            'pricing_plan_id' => ['nullable', 'exists:library_pricing_plans,id', $this->pricingPlanMatchesType($request->input('resource_type'))],
             'file' => ['required', 'file', 'mimes:pdf,epub,doc,docx,txt', 'max:51200'],
             'cover_image' => ['nullable', 'image', 'max:5120'],
         ]);
@@ -134,7 +138,9 @@ class DigitalResourceController extends Controller
     {
         abort_unless($resource->canBeEditedBy(Auth::user()), 403, 'You do not have permission to edit this resource.');
 
-        return view('modules.library.digital-resources.edit', compact('resource'));
+        $pricingPlans = LibraryPricingPlan::active()->orderBy('name')->get();
+
+        return view('modules.library.digital-resources.edit', compact('resource', 'pricingPlans'));
     }
 
     public function update(Request $request, LibraryDigitalResource $resource)
@@ -149,6 +155,7 @@ class DigitalResourceController extends Controller
             'subject' => ['nullable', 'string', 'max:255'],
             'keywords' => ['nullable', 'string', 'max:255'],
             'access_level' => ['required', 'in:all_users,members_only,staff_only'],
+            'pricing_plan_id' => ['nullable', 'exists:library_pricing_plans,id', $this->pricingPlanMatchesType($request->input('resource_type'))],
             'file' => ['nullable', 'file', 'mimes:pdf,epub,doc,docx,txt', 'max:51200'],
             'cover_image' => ['nullable', 'image', 'max:5120'],
         ]);
@@ -239,6 +246,12 @@ class DigitalResourceController extends Controller
     {
         $this->authorizeView($resource);
 
+        if ($resource->requiresPayment() && ! $resource->isPurchasedBy(Auth::user())) {
+            return redirect()
+                ->route('library.public.digital.purchase', $resource)
+                ->with('info', 'This resource requires payment before it can be downloaded.');
+        }
+
         abort_unless($resource->file_path, 404, 'No file available for this resource.');
 
         if (! Auth::user()?->hasModulePermission('library', 'manage-digital-collection')) {
@@ -284,6 +297,26 @@ class DigitalResourceController extends Controller
     | Authorization helpers
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * A pricing plan scoped to one resource_type can't be attached to
+     * a resource of a different type — plans left "any type"
+     * (resource_type = null) fit everything.
+     */
+    protected function pricingPlanMatchesType(?string $resourceType)
+    {
+        return function ($attribute, $value, $fail) use ($resourceType) {
+            if (! $value) {
+                return;
+            }
+
+            $plan = LibraryPricingPlan::find($value);
+
+            if ($plan && $plan->resource_type && $plan->resource_type !== $resourceType) {
+                $fail('The selected pricing plan is not available for this resource type.');
+            }
+        };
+    }
 
     protected function authorizeUploadAccess(): void
     {

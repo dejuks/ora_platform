@@ -1,75 +1,102 @@
-# Journal Category Filters + A-Z Sort — corrected patch
+# ORA Platform — Digital Library Payment Integration
 
-This replaces the earlier scaffold (which was wired to the wrong model)
-with a version built directly against your uploaded `app.zip`. Every
-file here was checked against your actual `Manuscript` model,
-`Journal\PublicController`, `Journal\ManuscriptController`,
-`RoleSeeder`, and the `Wiki\CategoryController` pattern it now mirrors.
+Full CRUD pricing plans + Chapa checkout for paid digital resources
+(ebooks, journal articles, papers, other), for the ORA Platform
+Digital Library module.
 
-## What this does
+## What this adds
 
-- Adds a `journal_categories` table + `category_id` on `manuscripts`
-- Full CRUD for categories at `/journal/categories` (Journal Manager only,
-  gated by the `manage-categories` permission — same pattern as Wiki)
-- Authors can pick a category when submitting/editing a manuscript
-- The public portal at `/journal/articles` now has:
-  - an A–Z bar (filters by first letter of the title)
-  - a category sidebar with per-category counts
-  - a sort control (A–Z / Z–A / newest)
-  - all combinable with the existing search box
-- The public portal (index + article page) now shares a real top nav
-  with your home page — same brand, same theme colors, and the same
-  list of modules pulled live from the `modules` table, not a
-  hardcoded copy
+- **`library_pricing_plans`** — a full CRUD list of fee rules (name,
+  optional resource-type scope, amount, currency, active/inactive)
+  managed by the Library Manager (`manage-settings`), under
+  **Library → Pricing Plans** in the sidebar.
+- **`library_digital_resources.pricing_plan_id`** — a Digital
+  Librarian assigns one of these plans (or none = free) when
+  uploading/editing a resource.
+- **`library_resource_purchases`** — one row per Chapa checkout
+  attempt; snapshots the amount/currency actually charged so a later
+  change to the plan (or its deletion) never rewrites history.
+- A public checkout flow: a paid resource shows a "Buy Access" button
+  instead of "Download" until the logged-in user has a completed
+  purchase. Buying auto-enrolls the user into the Library module if
+  they aren't already (same pattern as the existing hold/reserve
+  flow) — no separate sign-up needed first.
+- Staff with `manage-digital-collection`, and a resource's own owner
+  (`submit-digital-content`), always bypass payment for their own
+  reviewing/uploading, exactly like the rest of the module already
+  works for access tiers.
 
-## Apply in this order
+## How to apply
 
-1. **Delete these superseded files** from your project:
-   - `app/Http/Controllers/Admin/JournalCategoryController.php`
-   - `app/Http/Controllers/ArticleController.php`
-   - `resources/views/admin/journal-categories/` (empty dir)
-   - `resources/views/journal/` (my earlier generic view, unused)
-   - `routes/journal-routes-to-merge.php`
+1. Copy every file in this archive into your `ora_platform` working
+   copy, preserving paths (they overlay directly onto
+   `app/`, `database/`, `resources/`, `routes/`, `bootstrap/`).
+   Two files (`app/Models/LibraryDigitalResource.php`,
+   `app/Http/Controllers/Library/DigitalResourceController.php`,
+   `app/Http/Controllers/Library/PublicController.php`,
+   `app/Services/SidebarService.php`, `routes/web.php`,
+   `bootstrap/app.php`, `database/seeders/RoleSeeder.php`) are edited
+   copies of files that already exist in your repo — they fully
+   replace the originals, they aren't diffs to merge by hand.
 
-2. **Copy every file in this zip** into your project at the matching
-   path (it overwrites `database/migrations/2026_07_26_..._create_journal_categories_table.php`,
-   `app/Models/JournalCategory.php`, `app/Models/Manuscript.php`,
-   `app/Http/Controllers/Journal/ManuscriptController.php`, and
-   `database/seeders/RoleSeeder.php` with corrected versions — that's
-   expected).
-
-3. **Patch routes/web.php** — see `routes/ROUTES_PATCH_INSTRUCTIONS.md`
-   inside this zip for the exact 1-line addition + where it goes.
-
-4. Run:
-   ```bash
+2. Run the new migrations:
+   ```
    php artisan migrate
+   ```
+
+3. Re-run the role seeder so Library Manager picks up the new
+   `manage-payments` permission (used to notify staff when a purchase
+   completes):
+   ```
    php artisan db:seed --class=RoleSeeder
    ```
-   (safe to re-run — both are idempotent)
+   This seeder uses `updateOrCreate`/`sync`, so it's safe to re-run —
+   it won't duplicate or reset anything else.
 
-5. Seed some default categories (Fiction, Literature, Science, etc.) —
-   either add them yourself at `/journal/categories` once logged in as
-   Journal Manager, or run this one-off in `php artisan tinker`:
-   ```php
-   collect(['Fiction','Literature','Science','Social Science','History','Poetry','Others'])
-       ->each(fn($n) => \App\Models\JournalCategory::firstOrCreate(
-           ['slug' => \Illuminate\Support\Str::slug($n)],
-           ['name' => $n, 'is_active' => true]
-       ));
+4. Make sure your `.env` already has (it should, if Ebook/Journal
+   payments work today):
+   ```
+   CHAPA_SECRET_KEY=...
+   CHAPA_PUBLIC_KEY=...
    ```
 
-6. Visit `/journal/articles` — you should see the same top nav as your
-   home page, plus the A-Z bar and category sidebar.
+5. Create a pricing plan: **Library → Pricing Plans → New Pricing
+   Plan**. Then, on any digital resource's create/edit form, pick it
+   under the new **Pricing** card.
 
-## Note on the shared nav partial
+6. For the Chapa webhook to actually confirm payments
+   (`library/digital-resources/payments/chapa/webhook`), your server
+   needs to be reachable from the internet — same requirement as your
+   existing Ebook/Journal webhooks, so if those work in production
+   already, this will too. Locally, the "return" redirect after
+   checkout will also attempt to verify+settle the payment as a
+   convenience, but the webhook is the real source of truth.
 
-`resources/views/partials/public-top-nav.blade.php` is written to be
-reusable — any other module's public page (`ebook.public.index`,
-`wiki.public.index`, `repository.public.index`) can adopt the exact
-same nav by adding `@include('partials.public-top-nav', ['active' => 'ebook'])`
-(etc.) in place of whatever standalone header it currently has, so the
-whole platform's public pages end up visually and navigationally
-consistent — not just the Journal one. I only wired it into Journal
-since that's what you asked for, but it's a one-line change per page
-if you want the same treatment elsewhere.
+## Files in this archive
+
+```
+app/Http/Controllers/Library/DigitalResourceController.php   (edited)
+app/Http/Controllers/Library/DigitalResourcePaymentController.php (new)
+app/Http/Controllers/Library/PricingPlanController.php        (new)
+app/Http/Controllers/Library/PublicController.php              (edited)
+app/Models/LibraryDigitalResource.php                          (edited)
+app/Models/LibraryPricingPlan.php                              (new)
+app/Models/LibraryResourcePurchase.php                         (new)
+app/Services/SidebarService.php                                (edited)
+bootstrap/app.php                                               (edited)
+database/migrations/2027_07_28_000100_create_library_pricing_plans_table.php
+database/migrations/2027_07_28_000200_add_pricing_plan_id_to_library_digital_resources_table.php
+database/migrations/2027_07_28_000300_create_library_resource_purchases_table.php
+database/seeders/RoleSeeder.php                                (edited)
+resources/views/modules/library/digital-resources/create.blade.php (edited)
+resources/views/modules/library/digital-resources/edit.blade.php   (edited)
+resources/views/modules/library/digital-resources/index.blade.php  (edited)
+resources/views/modules/library/digital-resources/payment.blade.php (new)
+resources/views/modules/library/digital-resources/show.blade.php    (edited)
+resources/views/modules/library/pricing-plans/create.blade.php (new)
+resources/views/modules/library/pricing-plans/edit.blade.php   (new)
+resources/views/modules/library/pricing-plans/index.blade.php  (new)
+resources/views/modules/library/public/digital-index.blade.php (edited)
+resources/views/modules/library/public/digital-show.blade.php  (edited)
+routes/web.php                                                  (edited)
+```

@@ -46,6 +46,7 @@
         .resource-meta { font-size: 13px; color: #6b625c; margin-bottom: 10px; }
         .badge-type { background: #f3ede3; color: #6d1f49; font-weight: 600; }
         .badge-access { background: #eef4ee; color: #3c5c2b; font-weight: 600; }
+        .badge-price { background: #fbeed9; color: #8a5a10; font-weight: 600; }
 
         .site-footer { padding: 28px 0; text-align: center; color: #6b625c; font-size: 13px; border-top: 1px solid #e6e0d5; margin-top: 40px; }
     </style>
@@ -115,6 +116,11 @@
                                 <span class="badge badge-type me-1">{{ $resourceTypes[$resource->resource_type] ?? $resource->resource_type }}</span>
                                 @if($resource->access_level === 'members_only')
                                     <span class="badge badge-access"><i class="bi bi-lock"></i> Members Only</span>
+                                @endif
+                                @if($resource->requiresPayment())
+                                    <span class="badge badge-price">
+                                        <i class="bi bi-cash-coin"></i> {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+                                    </span>
                                 @endif
                             </div>
                             <h3><a href="{{ route('library.public.digital.show', $resource) }}">{{ $resource->title }}</a></h3>

@@ -20,6 +20,7 @@
         .resource-paper { background: #fff; border: 1px solid #e6e0d5; border-radius: 14px; padding: 40px; margin-top: 30px; }
         .badge-type { background: #f3ede3; color: #6d1f49; font-weight: 600; }
         .badge-access { background: #eef4ee; color: #3c5c2b; font-weight: 600; }
+        .badge-price { background: #fbeed9; color: #8a5a10; font-weight: 600; }
         .meta-row { color: #6b625c; font-size: 14px; }
         .cover-thumb {
             width: 100%; height: 220px; border-radius: 10px; border: 1px solid #e6e0d5;
@@ -71,6 +72,12 @@
                 <?php if($resource->access_level === 'members_only'): ?>
                     <span class="badge badge-access mb-3"><i class="bi bi-lock"></i> Members Only</span>
                 <?php endif; ?>
+                <?php if($resource->requiresPayment()): ?>
+                    <span class="badge badge-price mb-3">
+                        <i class="bi bi-cash-coin"></i> <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->price(), 2)); ?>
+
+                    </span>
+                <?php endif; ?>
 
                 <h1 class="h3 mb-3"><?php echo e($resource->title); ?></h1>
 
@@ -86,9 +93,16 @@
                     <p><?php echo e($resource->description); ?></p>
                 <?php endif; ?>
 
-                <a href="<?php echo e(route('library.public.digital.download', $resource)); ?>" class="btn btn-primary mt-2">
-                    <i class="bi bi-download"></i> Download
-                </a>
+                <?php if($resource->requiresPayment() && ! $resource->isPurchasedBy(auth()->user())): ?>
+                    <a href="<?php echo e(route('library.public.digital.purchase', $resource)); ?>" class="btn btn-warning mt-2">
+                        <i class="bi bi-cash-coin"></i> Buy Access — <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->price(), 2)); ?>
+
+                    </a>
+                <?php else: ?>
+                    <a href="<?php echo e(route('library.public.digital.download', $resource)); ?>" class="btn btn-primary mt-2">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                <?php endif; ?>
 
             </div>
         </div>

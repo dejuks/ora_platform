@@ -218,6 +218,14 @@ class PublicController extends Controller
     {
         abort_unless($resource->isAccessibleBy(Auth::user()), 403, 'You do not have access to this resource. It may require a library membership.');
 
+        if ($resource->requiresPayment() && ! $resource->isPurchasedBy(Auth::user())) {
+            abort_unless(Auth::check(), 403, 'This resource requires payment. Please log in to purchase access.');
+
+            return redirect()
+                ->route('library.public.digital.purchase', $resource)
+                ->with('info', 'This resource requires payment before it can be downloaded.');
+        }
+
         abort_unless($resource->file_path, 404, 'No file available for this resource.');
 
         $resource->increment('downloads_count');

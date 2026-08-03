@@ -20,6 +20,7 @@
         .resource-paper { background: #fff; border: 1px solid #e6e0d5; border-radius: 14px; padding: 40px; margin-top: 30px; }
         .badge-type { background: #f3ede3; color: #6d1f49; font-weight: 600; }
         .badge-access { background: #eef4ee; color: #3c5c2b; font-weight: 600; }
+        .badge-price { background: #fbeed9; color: #8a5a10; font-weight: 600; }
         .meta-row { color: #6b625c; font-size: 14px; }
         .cover-thumb {
             width: 100%; height: 220px; border-radius: 10px; border: 1px solid #e6e0d5;
@@ -70,6 +71,11 @@
                 @if($resource->access_level === 'members_only')
                     <span class="badge badge-access mb-3"><i class="bi bi-lock"></i> Members Only</span>
                 @endif
+                @if($resource->requiresPayment())
+                    <span class="badge badge-price mb-3">
+                        <i class="bi bi-cash-coin"></i> {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+                    </span>
+                @endif
 
                 <h1 class="h3 mb-3">{{ $resource->title }}</h1>
 
@@ -85,9 +91,15 @@
                     <p>{{ $resource->description }}</p>
                 @endif
 
-                <a href="{{ route('library.public.digital.download', $resource) }}" class="btn btn-primary mt-2">
-                    <i class="bi bi-download"></i> Download
-                </a>
+                @if($resource->requiresPayment() && ! $resource->isPurchasedBy(auth()->user()))
+                    <a href="{{ route('library.public.digital.purchase', $resource) }}" class="btn btn-warning mt-2">
+                        <i class="bi bi-cash-coin"></i> Buy Access — {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+                    </a>
+                @else
+                    <a href="{{ route('library.public.digital.download', $resource) }}" class="btn btn-primary mt-2">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                @endif
 
             </div>
         </div>
