@@ -7,7 +7,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link href="{{ asset('vendors/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="<?php echo e(asset('vendors/bootstrap/css/bootstrap.min.css')); ?>" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -79,30 +79,30 @@
 
 <body>
 
-    @include('partials.public-top-nav', ['active' => 'repository'])
+    <?php echo $__env->make('partials.public-top-nav', ['active' => 'repository'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <div class="container hero">
         <div class="breadcrumb-row">
-            <a href="{{ route('portal') }}">Home</a> / <span>Repository</span>
+            <a href="<?php echo e(route('portal')); ?>">Home</a> / <span>Repository</span>
         </div>
         <h1 class="h3">Scholarly Works Repository</h1>
         <p class="text-muted">Open access research, datasets, and scholarly records from the Oromo community.</p>
 
-        <form method="GET" action="{{ route('repository.public.index') }}" class="search-box mb-2">
+        <form method="GET" action="<?php echo e(route('repository.public.index')); ?>" class="search-box mb-2">
             <div class="row g-2">
                 <div class="col-md-8">
                     <div class="input-group">
                         <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                         <input type="text" name="q" class="form-control" placeholder="Search by title, author, or keyword"
-                               value="{{ request('q') }}">
+                               value="<?php echo e(request('q')); ?>">
                     </div>
                 </div>
                 <div class="col-md-3">
                     <select name="type" class="form-select">
                         <option value="">All types</option>
-                        @foreach($resourceTypes as $value => $label)
-                            <option value="{{ $value }}" {{ request('type') === $value ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
+                        <?php $__currentLoopData = $resourceTypes; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $value => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <option value="<?php echo e($value); ?>" <?php echo e(request('type') === $value ? 'selected' : ''); ?>><?php echo e($label); ?></option>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </select>
                 </div>
                 <div class="col-md-1">
@@ -115,49 +115,55 @@
     <div class="container pb-5">
 
         <div class="row g-4">
-            @forelse($items as $item)
+            <?php $__empty_1 = true; $__currentLoopData = $items; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $item): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                 <div class="col-md-4">
                     <div class="item-card">
                         <div class="mb-2">
-                            <span class="badge badge-type">{{ $item->resourceTypeLabel() }}</span>
-                            <span class="badge {{ $item->access_level === 'open' ? 'badge-open' : 'badge-restricted' }}">
-                                {{ $item->accessLevelLabel() }}
+                            <span class="badge badge-type"><?php echo e($item->resourceTypeLabel()); ?></span>
+                            <span class="badge <?php echo e($item->access_level === 'open' ? 'badge-open' : 'badge-restricted'); ?>">
+                                <?php echo e($item->accessLevelLabel()); ?>
+
                             </span>
                         </div>
                         <div>
-                            <a href="{{ route('repository.public.show', $item) }}" class="item-title">
-                                {{ $item->title }}
+                            <a href="<?php echo e(route('repository.public.show', $item)); ?>" class="item-title">
+                                <?php echo e($item->title); ?>
+
                             </a>
                         </div>
                         <p class="text-muted small mt-2 mb-2">
-                            {{ $item->authors }} ·
-                            {{ optional($item->publication_date ?? $item->published_at)->format('Y') }}
+                            <?php echo e($item->authors); ?> ·
+                            <?php echo e(optional($item->publication_date ?? $item->published_at)->format('Y')); ?>
+
                         </p>
                         <p class="small mb-3">
-                            {{ \Illuminate\Support\Str::limit($item->abstract, 130) }}
+                            <?php echo e(\Illuminate\Support\Str::limit($item->abstract, 130)); ?>
+
                         </p>
-                        <a href="{{ route('repository.public.show', $item) }}" class="small">
+                        <a href="<?php echo e(route('repository.public.show', $item)); ?>" class="small">
                             View record <i class="bi bi-arrow-right"></i>
                         </a>
                     </div>
                 </div>
-            @empty
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <div class="col-12 text-center text-muted py-5">
                     <i class="bi bi-archive" style="font-size: 2rem;"></i>
                     <p class="mt-2 mb-0">No items have been published yet.</p>
                 </div>
-            @endforelse
+            <?php endif; ?>
         </div>
 
         <div class="mt-4">
-            {{ $items->links() }}
+            <?php echo e($items->links()); ?>
+
         </div>
 
     </div>
 
     <footer class="site-footer">
-        © {{ date('Y') }} Oromo Research Association (ORA) Repository Management System
+        © <?php echo e(date('Y')); ?> Oromo Research Association (ORA) Repository Management System
     </footer>
 
 </body>
 </html>
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/modules/repository/public/index.blade.php ENDPATH**/ ?>

@@ -3,22 +3,22 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>{{ $item->title }} - ORA Repository</title>
+    <title><?php echo e($item->title); ?> - ORA Repository</title>
 
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="{{ \Illuminate\Support\Str::limit($item->abstract, 160) }}">
+    <meta name="description" content="<?php echo e(\Illuminate\Support\Str::limit($item->abstract, 160)); ?>">
 
     <!-- Dublin Core metadata for discoverability -->
-    <meta name="DC.title" content="{{ $item->title }}">
-    <meta name="DC.creator" content="{{ $item->authors }}">
-    <meta name="DC.description" content="{{ $item->abstract }}">
-    <meta name="DC.type" content="{{ $item->resourceTypeLabel() }}">
-    <meta name="DC.date" content="{{ optional($item->publication_date)->format('Y-m-d') }}">
-    <meta name="DC.language" content="{{ $item->language }}">
-    @if($item->publisher)<meta name="DC.publisher" content="{{ $item->publisher }}">@endif
-    @if($item->rights_statement)<meta name="DC.rights" content="{{ $item->rights_statement }}">@endif
+    <meta name="DC.title" content="<?php echo e($item->title); ?>">
+    <meta name="DC.creator" content="<?php echo e($item->authors); ?>">
+    <meta name="DC.description" content="<?php echo e($item->abstract); ?>">
+    <meta name="DC.type" content="<?php echo e($item->resourceTypeLabel()); ?>">
+    <meta name="DC.date" content="<?php echo e(optional($item->publication_date)->format('Y-m-d')); ?>">
+    <meta name="DC.language" content="<?php echo e($item->language); ?>">
+    <?php if($item->publisher): ?><meta name="DC.publisher" content="<?php echo e($item->publisher); ?>"><?php endif; ?>
+    <?php if($item->rights_statement): ?><meta name="DC.rights" content="<?php echo e($item->rights_statement); ?>"><?php endif; ?>
 
-    <link href="{{ asset('vendors/bootstrap/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="<?php echo e(asset('vendors/bootstrap/css/bootstrap.min.css')); ?>" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -149,16 +149,16 @@
 
 <body>
 
-    @include('partials.public-top-nav', ['active' => 'repository'])
+    <?php echo $__env->make('partials.public-top-nav', ['active' => 'repository'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <div class="container pt-4">
         <div class="breadcrumb-row">
-            <a href="{{ route('portal') }}">Home</a> /
-            <a href="{{ route('repository.public.index') }}">Repository</a> /
-            <span>{{ \Illuminate\Support\Str::limit($item->title, 60) }}</span>
+            <a href="<?php echo e(route('portal')); ?>">Home</a> /
+            <a href="<?php echo e(route('repository.public.index')); ?>">Repository</a> /
+            <span><?php echo e(\Illuminate\Support\Str::limit($item->title, 60)); ?></span>
         </div>
 
-        <a href="{{ route('repository.public.index') }}" class="back-link">
+        <a href="<?php echo e(route('repository.public.index')); ?>" class="back-link">
             <i class="bi bi-arrow-left"></i> All Items
         </a>
     </div>
@@ -167,106 +167,108 @@
         <div class="record-paper">
 
             <div>
-                <span class="badge badge-type">{{ $item->resourceTypeLabel() }}</span>
-                <span class="badge {{ $item->access_level === 'open' ? 'badge-open' : 'badge-restricted' }}">
-                    {{ $item->accessLevelLabel() }}
+                <span class="badge badge-type"><?php echo e($item->resourceTypeLabel()); ?></span>
+                <span class="badge <?php echo e($item->access_level === 'open' ? 'badge-open' : 'badge-restricted'); ?>">
+                    <?php echo e($item->accessLevelLabel()); ?>
+
                 </span>
             </div>
 
-            <h1 class="record-title">{{ $item->title }}</h1>
+            <h1 class="record-title"><?php echo e($item->title); ?></h1>
 
             <div class="meta-grid">
                 <div class="meta-item">
                     <span class="label">Author(s)</span>
-                    <span class="value">{{ $item->authors }}</span>
+                    <span class="value"><?php echo e($item->authors); ?></span>
                 </div>
-                @if($item->contributors)
+                <?php if($item->contributors): ?>
                     <div class="meta-item">
                         <span class="label">Contributors</span>
-                        <span class="value">{{ $item->contributors }}</span>
+                        <span class="value"><?php echo e($item->contributors); ?></span>
                     </div>
-                @endif
-                @if($item->publication_date)
+                <?php endif; ?>
+                <?php if($item->publication_date): ?>
                     <div class="meta-item">
                         <span class="label">Publication Date</span>
-                        <span class="value">{{ $item->publication_date->format('M d, Y') }}</span>
+                        <span class="value"><?php echo e($item->publication_date->format('M d, Y')); ?></span>
                     </div>
-                @endif
-                @if($item->publisher)
+                <?php endif; ?>
+                <?php if($item->publisher): ?>
                     <div class="meta-item">
                         <span class="label">Publisher</span>
-                        <span class="value">{{ $item->publisher }}</span>
+                        <span class="value"><?php echo e($item->publisher); ?></span>
                     </div>
-                @endif
-                @if($item->source)
+                <?php endif; ?>
+                <?php if($item->source): ?>
                     <div class="meta-item">
                         <span class="label">Source</span>
-                        <span class="value">{{ $item->source }}</span>
+                        <span class="value"><?php echo e($item->source); ?></span>
                     </div>
-                @endif
-                @if($item->keywords)
+                <?php endif; ?>
+                <?php if($item->keywords): ?>
                     <div class="meta-item">
                         <span class="label">Keywords</span>
-                        <span class="value">{{ $item->keywords }}</span>
+                        <span class="value"><?php echo e($item->keywords); ?></span>
                     </div>
-                @endif
+                <?php endif; ?>
                 <div class="meta-item">
                     <span class="label">Language</span>
-                    <span class="value">{{ strtoupper($item->language) }}</span>
+                    <span class="value"><?php echo e(strtoupper($item->language)); ?></span>
                 </div>
-                @if($item->external_identifier)
+                <?php if($item->external_identifier): ?>
                     <div class="meta-item">
                         <span class="label">Identifier</span>
-                        <span class="value">{{ $item->external_identifier }}</span>
+                        <span class="value"><?php echo e($item->external_identifier); ?></span>
                     </div>
-                @endif
-                @if($item->rights_statement)
+                <?php endif; ?>
+                <?php if($item->rights_statement): ?>
                     <div class="meta-item">
                         <span class="label">Rights</span>
-                        <span class="value">{{ $item->rights_statement }}</span>
+                        <span class="value"><?php echo e($item->rights_statement); ?></span>
                     </div>
-                @endif
+                <?php endif; ?>
                 <div class="meta-item">
                     <span class="label">Persistent URL</span>
-                    <span class="value"><a href="{{ $item->persistent_url }}">{{ $item->persistent_url }}</a></span>
+                    <span class="value"><a href="<?php echo e($item->persistent_url); ?>"><?php echo e($item->persistent_url); ?></a></span>
                 </div>
             </div>
 
             <h2 class="section-label">Abstract</h2>
-            <p class="body-text mb-4">{{ $item->abstract }}</p>
+            <p class="body-text mb-4"><?php echo e($item->abstract); ?></p>
 
-            @if($item->bibliographic_references)
+            <?php if($item->bibliographic_references): ?>
                 <h2 class="section-label">References</h2>
-                <p class="body-text mb-4" style="white-space: pre-line;">{{ $item->bibliographic_references }}</p>
-            @endif
+                <p class="body-text mb-4" style="white-space: pre-line;"><?php echo e($item->bibliographic_references); ?></p>
+            <?php endif; ?>
 
             <h2 class="section-label">Cite this item</h2>
-            <div class="citation-box mb-4">{{ $item->citation() }}</div>
+            <div class="citation-box mb-4"><?php echo e($item->citation()); ?></div>
 
             <div>
-                @if($item->access_level === 'open')
-                    <a href="{{ route('repository.items.download', $item) }}" class="btn-navy">
+                <?php if($item->access_level === 'open'): ?>
+                    <a href="<?php echo e(route('repository.items.download', $item)); ?>" class="btn-navy">
                         <i class="bi bi-file-earmark-arrow-down"></i> Download Full Text
                     </a>
-                @else
-                    @auth
-                        <a href="{{ route('repository.items.download', $item) }}" class="btn-navy">
+                <?php else: ?>
+                    <?php if(auth()->guard()->check()): ?>
+                        <a href="<?php echo e(route('repository.items.download', $item)); ?>" class="btn-navy">
                             <i class="bi bi-file-earmark-arrow-down"></i> Download Full Text
                         </a>
-                    @else
-                        <a href="{{ route('login') }}" class="btn-navy-outline">
+                    <?php else: ?>
+                        <a href="<?php echo e(route('login')); ?>" class="btn-navy-outline">
                             <i class="bi bi-lock"></i> Sign In to Download (Restricted Item)
                         </a>
-                    @endauth
-                @endif
+                    <?php endif; ?>
+                <?php endif; ?>
             </div>
 
         </div>
     </div>
 
     <footer class="site-footer">
-        © {{ date('Y') }} Oromo Research Association (ORA) Repository Management System
+        © <?php echo e(date('Y')); ?> Oromo Research Association (ORA) Repository Management System
     </footer>
 
 </body>
 </html>
+<?php /**PATH C:\Users\Dejene\Desktop\project\ora\resources\views/modules/repository/public/show.blade.php ENDPATH**/ ?>

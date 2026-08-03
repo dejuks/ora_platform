@@ -13,15 +13,42 @@
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background: #fbfaf7; color: #201510; }
+        /* Same design tokens as the rest of the public site
+           (partials.public-top-nav / portal.index / journal show page)
+           so every public page reads as one platform. */
+        :root{
+            --ink:        #201510;
+            --navy:       #350f22;
+            --navy-2:     #6d1f49;
+            --gold:       #a5702f;
+            --gold-soft:  #dba75f;
+            --paper:      #fbfaf7;
+            --line:       #e6e0d5;
+            --muted:      #6b625c;
+            --panel:      #f4efe6;
+        }
+
+        body { font-family: 'Inter', sans-serif; background: var(--paper); color: var(--ink); }
 
         .hero { padding: 32px 0 16px; }
         h1, .brand-word { font-family: 'Newsreader', serif; }
 
+        .breadcrumb-row { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+        .breadcrumb-row a { color: var(--muted); }
+        .breadcrumb-row a:hover { color: var(--navy); }
+
         .search-box .form-control {
             border-radius: 10px;
             padding: 12px 15px;
-            border: 1px solid #e6e0d5;
+            border: 1px solid var(--line);
+        }
+        .search-box .btn-primary {
+            background: var(--navy);
+            border-color: var(--navy);
+        }
+        .search-box .btn-primary:hover {
+            background: var(--navy-2);
+            border-color: var(--navy-2);
         }
 
         /* A-Z filter bar */
@@ -39,14 +66,14 @@
             height: 34px;
             padding: 0 8px;
             border-radius: 8px;
-            border: 1px solid #e6e0d5;
-            color: #201510;
+            border: 1px solid var(--line);
+            color: var(--ink);
             font-size: 13.5px;
             font-weight: 600;
             text-decoration: none;
         }
-        .az-bar a:hover { border-color: #350f22; color: #350f22; }
-        .az-bar a.is-active { background: #350f22; border-color: #350f22; color: #fff; }
+        .az-bar a:hover { border-color: var(--navy); color: var(--navy); }
+        .az-bar a.is-active { background: var(--navy); border-color: var(--navy); color: #fff; }
 
         /* Category sidebar */
         .cat-list { list-style: none; padding: 0; margin: 0 0 24px; }
@@ -56,27 +83,27 @@
             justify-content: space-between;
             padding: 8px 10px;
             border-radius: 8px;
-            color: #201510;
+            color: var(--ink);
             text-decoration: none;
             font-size: 14px;
         }
-        .cat-list a:hover { background: #f4efe6; }
-        .cat-list a.is-active { background: #350f22; color: #fff; font-weight: 600; }
-        .cat-list .count { color: #6b625c; font-size: 12.5px; }
-        .cat-list a.is-active .count { color: #dba75f; }
+        .cat-list a:hover { background: var(--panel); }
+        .cat-list a.is-active { background: var(--navy); color: #fff; font-weight: 600; }
+        .cat-list .count { color: var(--muted); font-size: 12.5px; }
+        .cat-list a.is-active .count { color: var(--gold-soft); }
 
         .sidebar-heading {
             text-transform: uppercase;
             letter-spacing: 0.06em;
             font-size: 11.5px;
             font-weight: 700;
-            color: #6b625c;
+            color: var(--muted);
             margin: 0 0 10px;
         }
 
         .article-card {
             background: #fff;
-            border: 1px solid #e6e0d5;
+            border: 1px solid var(--line);
             border-radius: 14px;
             padding: 22px;
             height: 100%;
@@ -85,13 +112,14 @@
         .article-card:hover {
             box-shadow: 0 10px 25px rgba(0,0,0,0.06);
             transform: translateY(-2px);
+            border-color: var(--gold-soft);
         }
-        .article-title { font-weight: 700; color: #201510; text-decoration: none; }
-        .article-title:hover { color: #350f22; }
+        .article-title { font-weight: 700; color: var(--ink); text-decoration: none; }
+        .article-title:hover { color: var(--navy); }
         .badge-published { background: #dcfce7; color: #166534; font-weight: 600; }
-        .badge-category { background: #f4efe6; color: #350f22; font-weight: 600; }
+        .badge-category { background: var(--panel); color: var(--navy); font-weight: 600; }
 
-        .site-footer { text-align: center; color: #94a3b8; font-size: 13px; padding: 30px 0; }
+        .site-footer { text-align: center; color: var(--muted); font-size: 13px; padding: 30px 0; }
     </style>
 </head>
 
@@ -100,6 +128,9 @@
     @include('partials.public-top-nav', ['active' => 'journal'])
 
     <div class="container hero">
+        <div class="breadcrumb-row">
+            <a href="{{ route('portal') }}">Home</a> / <span>Journal</span>
+        </div>
         <h1 class="h3">Published Articles</h1>
         <p class="text-muted">Peer-reviewed research from and about the Oromo community.</p>
 
