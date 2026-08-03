@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'journal/payments/chapa/webhook',
             'ebook/payments/chapa/webhook',
             'ebook/orders/chapa/webhook',
+            'library/digital-resources/payments/chapa/webhook',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -66,6 +66,14 @@
               </div>
               <h5 class="card-title"><?php echo e($resource->title); ?></h5>
               <p class="card-text text-muted small mb-1"><?php echo e($resource->author ?? 'Unknown author'); ?></p>
+              <?php if($resource->requiresPayment()): ?>
+                <p class="card-text small mb-1">
+                  <span class="badge bg-warning text-dark">
+                    <i class="bi bi-cash-coin"></i> <?php echo e($resource->currency()); ?> <?php echo e(number_format($resource->price(), 2)); ?>
+
+                  </span>
+                </p>
+              <?php endif; ?>
               <?php if($canManage): ?>
                 <p class="card-text small text-muted mb-2">
                   <i class="bi bi-eye"></i> <?php echo e($resource->views_count); ?>

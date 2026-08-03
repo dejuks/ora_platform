@@ -56,6 +56,13 @@
               </div>
               <h5 class="card-title">{{ $resource->title }}</h5>
               <p class="card-text text-muted small mb-1">{{ $resource->author ?? 'Unknown author' }}</p>
+              @if($resource->requiresPayment())
+                <p class="card-text small mb-1">
+                  <span class="badge bg-warning text-dark">
+                    <i class="bi bi-cash-coin"></i> {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+                  </span>
+                </p>
+              @endif
               @if($canManage)
                 <p class="card-text small text-muted mb-2">
                   <i class="bi bi-eye"></i> {{ $resource->views_count }}

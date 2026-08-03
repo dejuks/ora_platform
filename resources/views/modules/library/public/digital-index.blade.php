@@ -37,8 +37,9 @@
         }
         .resource-cover {
             height: 140px; background: #f3ede3; display: flex; align-items: center;
-            justify-content: center; font-size: 2.2rem; color: #a5702f;
+            justify-content: center; font-size: 2.2rem; color: #a5702f; overflow: hidden;
         }
+        .resource-cover img { width: 100%; height: 100%; object-fit: cover; }
         .resource-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
         .resource-card-body h3 { font-size: 1.02rem; margin-bottom: 6px; }
         .resource-card-body h3 a { color: #201510; text-decoration: none; }
@@ -46,6 +47,7 @@
         .resource-meta { font-size: 13px; color: #6b625c; margin-bottom: 10px; }
         .badge-type { background: #f3ede3; color: #6d1f49; font-weight: 600; }
         .badge-access { background: #eef4ee; color: #3c5c2b; font-weight: 600; }
+        .badge-price { background: #fbeed9; color: #8a5a10; font-weight: 600; }
 
         .site-footer { padding: 28px 0; text-align: center; color: #6b625c; font-size: 13px; border-top: 1px solid #e6e0d5; margin-top: 40px; }
     </style>
@@ -103,18 +105,27 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="resource-card">
                         <div class="resource-cover">
-                            <i class="bi {{ match($resource->resource_type) {
-                                'ebook' => 'bi-book',
-                                'journal_article' => 'bi-file-earmark-text',
-                                'paper' => 'bi-file-earmark-richtext',
-                                default => 'bi-file-earmark',
-                            } }}"></i>
+                            @if($resource->cover_image)
+                                <img src="{{ \Illuminate\Support\Facades\Storage::url($resource->cover_image) }}" alt="{{ $resource->title }}">
+                            @else
+                                <i class="bi {{ match($resource->resource_type) {
+                                    'ebook' => 'bi-book',
+                                    'journal_article' => 'bi-file-earmark-text',
+                                    'paper' => 'bi-file-earmark-richtext',
+                                    default => 'bi-file-earmark',
+                                } }}"></i>
+                            @endif
                         </div>
                         <div class="resource-card-body">
                             <div class="mb-2">
                                 <span class="badge badge-type me-1">{{ $resourceTypes[$resource->resource_type] ?? $resource->resource_type }}</span>
                                 @if($resource->access_level === 'members_only')
                                     <span class="badge badge-access"><i class="bi bi-lock"></i> Members Only</span>
+                                @endif
+                                @if($resource->requiresPayment())
+                                    <span class="badge badge-price">
+                                        <i class="bi bi-cash-coin"></i> {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+                                    </span>
                                 @endif
                             </div>
                             <h3><a href="{{ route('library.public.digital.show', $resource) }}">{{ $resource->title }}</a></h3>

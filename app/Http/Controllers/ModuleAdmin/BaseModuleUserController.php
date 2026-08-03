@@ -17,11 +17,10 @@ use Illuminate\Validation\Rule;
  * Each module (Journal, Ebook, Library, Researcher, Wiki, Repository)
  * has a thin controller that extends this and sets $moduleCode. A
  * module admin using this screen can only ever view, add, edit, or
- * remove users inside THEIR module, and can only assign that module's
- * own roles (e.g. Author, Reviewer, Associate Editor for Journal):
+ * remove users inside THEIR module, and can assign any role that
+ * belongs to that module — including its top-level admin role
+ * (e.g. Journal Manager, Library Manager).
  *
- *  - Roles flagged is_admin_role (e.g. "Journal Manager") can never
- *    be granted from here — only from Admin > Users (Super Admin).
  *  - "Remove" detaches this user's roles in THIS module only. Roles
  *    they hold in other modules, and the account itself, are untouched.
  */
@@ -36,12 +35,12 @@ abstract class BaseModuleUserController extends Controller
 
     /**
      * Roles a module admin is allowed to hand out from this screen —
-     * every role in this module except the admin-type ones.
+     * every role that belongs to this module, admin-type roles
+     * included (e.g. Library Manager, Journal Manager).
      */
     protected function assignableRoles(Module $module)
     {
         return Role::where('module_id', $module->id)
-            ->where('is_admin_role', false)
             ->orderBy('name')
             ->get();
     }
@@ -55,8 +54,8 @@ abstract class BaseModuleUserController extends Controller
         $module = $this->module();
 
         $users = User::whereHas('moduleRoles', function ($query) use ($module) {
-                $query->where('roles.module_id', $module->id);
-            })
+            $query->where('roles.module_id', $module->id);
+        })
             ->with(['moduleRoles' => function ($query) use ($module) {
                 $query->where('roles.module_id', $module->id);
             }])

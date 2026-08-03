@@ -185,6 +185,10 @@ class SidebarService
                 if ($user->hasModulePermission('library', 'manage-categories') && Route::has('library.categories.index')) {
                     $children[] = ['title' => 'Categories', 'icon' => 'bi-tags', 'route' => 'library.categories.index'];
                 }
+
+                if ($user->hasModulePermission('library', 'manage-settings') && Route::has('library.pricing-plans.index')) {
+                    $children[] = ['title' => 'Pricing Plans', 'icon' => 'bi-cash-coin', 'route' => 'library.pricing-plans.index'];
+                }
             }
 
             // Researchers' Network's own features: visible to any

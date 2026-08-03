@@ -19,13 +19,24 @@
           {{ $resource->statusLabel() }}
         </span>
         <span class="badge bg-info text-dark">{{ $resource->accessLevelLabel() }}</span>
+        @if($resource->requiresPayment())
+          <span class="badge bg-warning text-dark">
+            <i class="bi bi-cash-coin"></i> {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+          </span>
+        @endif
       </div>
 
       <div class="d-flex gap-2">
         @if($resource->file_path)
-          <a href="{{ route('library.digital-resources.download', $resource) }}" class="btn btn-primary">
-            <i class="bi bi-download"></i> Download
-          </a>
+          @if($resource->requiresPayment() && ! $canManage && ! $resource->isPurchasedBy($user))
+            <a href="{{ route('library.public.digital.purchase', $resource) }}" class="btn btn-warning">
+              <i class="bi bi-cash-coin"></i> Buy Access — {{ $resource->currency() }} {{ number_format($resource->price(), 2) }}
+            </a>
+          @else
+            <a href="{{ route('library.digital-resources.download', $resource) }}" class="btn btn-primary">
+              <i class="bi bi-download"></i> Download
+            </a>
+          @endif
         @endif
 
         @if($resource->canBeEditedBy($user))
@@ -87,6 +98,16 @@
               </dd>
 
               @if($canManage)
+                <dt class="col-sm-3">Pricing Plan</dt>
+                <dd class="col-sm-9">
+                  @if($resource->pricingPlan)
+                    {{ $resource->pricingPlan->name }} — {{ $resource->currency() }} {{ number_format($resource->pricingPlan->amount, 2) }}
+                    @unless($resource->pricingPlan->is_active) <span class="badge bg-secondary">Inactive</span> @endunless
+                  @else
+                    Free
+                  @endif
+                </dd>
+
                 <dt class="col-sm-3">Uploaded By</dt>
                 <dd class="col-sm-9">{{ $resource->uploadedBy->full_name ?? '—' }}</dd>
 

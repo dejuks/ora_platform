@@ -37,9 +37,11 @@ use App\Http\Controllers\Library\CirculationController as LibraryCirculationCont
 use App\Http\Controllers\Library\CirculationPolicyController as LibraryCirculationPolicyController;
 use App\Http\Controllers\Library\DashboardController as LibraryDashboardController;
 use App\Http\Controllers\Library\DigitalResourceController as LibraryDigitalResourceController;
+use App\Http\Controllers\Library\DigitalResourcePaymentController as LibraryDigitalResourcePaymentController;
 use App\Http\Controllers\Library\FineController as LibraryFineController;
 use App\Http\Controllers\Library\HoldController as LibraryHoldController;
 use App\Http\Controllers\Library\MemberController as LibraryMemberController;
+use App\Http\Controllers\Library\PricingPlanController as LibraryPricingPlanController;
 use App\Http\Controllers\Library\PublicController as LibraryPublicController;
 use App\Http\Controllers\Library\UserController as LibraryUserController;
 use App\Http\Controllers\ModuleEnrollmentController;
@@ -235,6 +237,21 @@ Route::prefix('library/catalog')
         Route::get('/digital/{resource}/download', [LibraryPublicController::class, 'digitalDownload'])
             ->name('digital.download');
 
+        // Paid digital resources: buying access is self-service, same
+        // "auth only, auto-enroll" reasoning as reserve() below rather
+        // than requiring a separate Library sign-up first.
+        Route::get('/digital/{resource}/purchase', [LibraryDigitalResourcePaymentController::class, 'show'])
+            ->middleware('auth')
+            ->name('digital.purchase');
+
+        Route::post('/digital/{resource}/purchase', [LibraryDigitalResourcePaymentController::class, 'process'])
+            ->middleware('auth')
+            ->name('digital.purchase.process');
+
+        Route::get('/digital/{resource}/purchase/return', [LibraryDigitalResourcePaymentController::class, 'returnFromChapa'])
+            ->middleware('auth')
+            ->name('digital.purchase.return');
+
         Route::get('/{book}', [LibraryPublicController::class, 'show'])->name('show');
 
         Route::post('/{book}/reserve', [LibraryPublicController::class, 'reserve'])
@@ -290,6 +307,9 @@ Route::post('journal/payments/chapa/webhook', [JournalPaymentController::class, 
 
 Route::post('ebook/payments/chapa/webhook', [EbookPaymentController::class, 'webhook'])
     ->name('ebook.payments.chapa.webhook');
+
+Route::post('library/digital-resources/payments/chapa/webhook', [LibraryDigitalResourcePaymentController::class, 'webhook'])
+    ->name('library.digital-resources.payments.chapa.webhook');
 
 /*
 |--------------------------------------------------------------------------
@@ -916,6 +936,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             Route::get('digital-resources/{resource}/download', [LibraryDigitalResourceController::class, 'download'])
                 ->name('digital-resources.download');
+
+            // Library Manager (manage-settings): full CRUD over the
+            // fee rules a Digital Librarian can attach to a paid
+            // digital resource. Purchasing itself lives on the public
+            // catalog — see 'library.public.digital.purchase' above.
+            Route::resource('pricing-plans', LibraryPricingPlanController::class)->except('show');
         });
 
     /*
