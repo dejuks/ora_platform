@@ -25,8 +25,9 @@
         .cover-thumb {
             width: 100%; height: 220px; border-radius: 10px; border: 1px solid #e6e0d5;
             background: #f3ede3; display: flex; align-items: center; justify-content: center;
-            color: #a5702f; font-size: 48px;
+            color: #a5702f; font-size: 48px; overflow: hidden;
         }
+        .cover-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .site-footer { text-align: center; color: #6b625c; font-size: 13px; padding: 30px 0; }
     </style>
 </head>
@@ -54,12 +55,16 @@
 
             <div class="col-md-3">
                 <div class="cover-thumb">
-                    <i class="bi <?php echo e(match($resource->resource_type) {
-                        'ebook' => 'bi-book',
-                        'journal_article' => 'bi-file-earmark-text',
-                        'paper' => 'bi-file-earmark-richtext',
-                        default => 'bi-file-earmark',
-                    }); ?>"></i>
+                    <?php if($resource->cover_image): ?>
+                        <img src="<?php echo e(\Illuminate\Support\Facades\Storage::url($resource->cover_image)); ?>" alt="<?php echo e($resource->title); ?>">
+                    <?php else: ?>
+                        <i class="bi <?php echo e(match($resource->resource_type) {
+                            'ebook' => 'bi-book',
+                            'journal_article' => 'bi-file-earmark-text',
+                            'paper' => 'bi-file-earmark-richtext',
+                            default => 'bi-file-earmark',
+                        }); ?>"></i>
+                    <?php endif; ?>
                 </div>
             </div>
 

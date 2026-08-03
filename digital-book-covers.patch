@@ -1,0 +1,93 @@
+diff --git a/resources/views/modules/library/digital-resources/edit.blade.php b/resources/views/modules/library/digital-resources/edit.blade.php
+index 37ff09f..67197b1 100644
+--- a/resources/views/modules/library/digital-resources/edit.blade.php
++++ b/resources/views/modules/library/digital-resources/edit.blade.php
+@@ -89,6 +89,12 @@
+           </div>
+           <div class="col-md-4">
+             <label class="form-label">Replace Cover Image (optional)</label>
++            @if($resource->cover_image)
++                <div class="mb-2">
++                    <img src="{{ \Illuminate\Support\Facades\Storage::url($resource->cover_image) }}"
++                         alt="Current cover" style="width: 80px; height: 110px; object-fit: cover; border: 1px solid #dee2e6; border-radius: 4px;">
++                </div>
++            @endif
+             <input type="file" name="cover_image" class="form-control" accept="image/*">
+           </div>
+         </div>
+diff --git a/resources/views/modules/library/public/digital-index.blade.php b/resources/views/modules/library/public/digital-index.blade.php
+index 11ac7cc..10132ef 100644
+--- a/resources/views/modules/library/public/digital-index.blade.php
++++ b/resources/views/modules/library/public/digital-index.blade.php
+@@ -37,8 +37,9 @@
+         }
+         .resource-cover {
+             height: 140px; background: #f3ede3; display: flex; align-items: center;
+-            justify-content: center; font-size: 2.2rem; color: #a5702f;
++            justify-content: center; font-size: 2.2rem; color: #a5702f; overflow: hidden;
+         }
++        .resource-cover img { width: 100%; height: 100%; object-fit: cover; }
+         .resource-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
+         .resource-card-body h3 { font-size: 1.02rem; margin-bottom: 6px; }
+         .resource-card-body h3 a { color: #201510; text-decoration: none; }
+@@ -103,12 +104,16 @@ class="{{ request('type') === $key ? 'is-active' : '' }}">{{ $label }}</a>
+                 <div class="col-md-6 col-lg-4">
+                     <div class="resource-card">
+                         <div class="resource-cover">
+-                            <i class="bi {{ match($resource->resource_type) {
+-                                'ebook' => 'bi-book',
+-                                'journal_article' => 'bi-file-earmark-text',
+-                                'paper' => 'bi-file-earmark-richtext',
+-                                default => 'bi-file-earmark',
+-                            } }}"></i>
++                            @if($resource->cover_image)
++                                <img src="{{ \Illuminate\Support\Facades\Storage::url($resource->cover_image) }}" alt="{{ $resource->title }}">
++                            @else
++                                <i class="bi {{ match($resource->resource_type) {
++                                    'ebook' => 'bi-book',
++                                    'journal_article' => 'bi-file-earmark-text',
++                                    'paper' => 'bi-file-earmark-richtext',
++                                    default => 'bi-file-earmark',
++                                } }}"></i>
++                            @endif
+                         </div>
+                         <div class="resource-card-body">
+                             <div class="mb-2">
+diff --git a/resources/views/modules/library/public/digital-show.blade.php b/resources/views/modules/library/public/digital-show.blade.php
+index b99b063..81a1bbb 100644
+--- a/resources/views/modules/library/public/digital-show.blade.php
++++ b/resources/views/modules/library/public/digital-show.blade.php
+@@ -24,8 +24,9 @@
+         .cover-thumb {
+             width: 100%; height: 220px; border-radius: 10px; border: 1px solid #e6e0d5;
+             background: #f3ede3; display: flex; align-items: center; justify-content: center;
+-            color: #a5702f; font-size: 48px;
++            color: #a5702f; font-size: 48px; overflow: hidden;
+         }
++        .cover-thumb img { width: 100%; height: 100%; object-fit: cover; }
+         .site-footer { text-align: center; color: #6b625c; font-size: 13px; padding: 30px 0; }
+     </style>
+ </head>
+@@ -53,12 +54,16 @@
+ 
+             <div class="col-md-3">
+                 <div class="cover-thumb">
+-                    <i class="bi {{ match($resource->resource_type) {
+-                        'ebook' => 'bi-book',
+-                        'journal_article' => 'bi-file-earmark-text',
+-                        'paper' => 'bi-file-earmark-richtext',
+-                        default => 'bi-file-earmark',
+-                    } }}"></i>
++                    @if($resource->cover_image)
++                        <img src="{{ \Illuminate\Support\Facades\Storage::url($resource->cover_image) }}" alt="{{ $resource->title }}">
++                    @else
++                        <i class="bi {{ match($resource->resource_type) {
++                            'ebook' => 'bi-book',
++                            'journal_article' => 'bi-file-earmark-text',
++                            'paper' => 'bi-file-earmark-richtext',
++                            default => 'bi-file-earmark',
++                        } }}"></i>
++                    @endif
+                 </div>
+             </div>
+ 

@@ -37,8 +37,9 @@
         }
         .resource-cover {
             height: 140px; background: #f3ede3; display: flex; align-items: center;
-            justify-content: center; font-size: 2.2rem; color: #a5702f;
+            justify-content: center; font-size: 2.2rem; color: #a5702f; overflow: hidden;
         }
+        .resource-cover img { width: 100%; height: 100%; object-fit: cover; }
         .resource-card-body { padding: 16px; flex: 1; display: flex; flex-direction: column; }
         .resource-card-body h3 { font-size: 1.02rem; margin-bottom: 6px; }
         .resource-card-body h3 a { color: #201510; text-decoration: none; }
@@ -104,12 +105,16 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="resource-card">
                         <div class="resource-cover">
-                            <i class="bi <?php echo e(match($resource->resource_type) {
-                                'ebook' => 'bi-book',
-                                'journal_article' => 'bi-file-earmark-text',
-                                'paper' => 'bi-file-earmark-richtext',
-                                default => 'bi-file-earmark',
-                            }); ?>"></i>
+                            <?php if($resource->cover_image): ?>
+                                <img src="<?php echo e(\Illuminate\Support\Facades\Storage::url($resource->cover_image)); ?>" alt="<?php echo e($resource->title); ?>">
+                            <?php else: ?>
+                                <i class="bi <?php echo e(match($resource->resource_type) {
+                                    'ebook' => 'bi-book',
+                                    'journal_article' => 'bi-file-earmark-text',
+                                    'paper' => 'bi-file-earmark-richtext',
+                                    default => 'bi-file-earmark',
+                                }); ?>"></i>
+                            <?php endif; ?>
                         </div>
                         <div class="resource-card-body">
                             <div class="mb-2">

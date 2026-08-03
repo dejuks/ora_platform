@@ -59,7 +59,7 @@ class ChapaService
             'callback_url' => $payload['callback_url'],
             'return_url' => $payload['return_url'],
             'customization' => [
-                'title' => $this->sanitizeForChapa($payload['title']),
+                'title' => $this->sanitizeForChapa($payload['title'], 16),
                 'description' => $this->sanitizeForChapa($payload['description']),
             ],
         ], fn ($value) => $value !== null);

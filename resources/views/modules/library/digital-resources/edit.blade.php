@@ -115,6 +115,12 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Replace Cover Image (optional)</label>
+            @if($resource->cover_image)
+                <div class="mb-2">
+                    <img src="{{ \Illuminate\Support\Facades\Storage::url($resource->cover_image) }}"
+                         alt="Current cover" style="width: 80px; height: 110px; object-fit: cover; border: 1px solid #dee2e6; border-radius: 4px;">
+                </div>
+            @endif
             <input type="file" name="cover_image" class="form-control" accept="image/*">
           </div>
         </div>

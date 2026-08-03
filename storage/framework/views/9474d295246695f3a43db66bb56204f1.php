@@ -87,6 +87,29 @@
       </div>
 
       <div class="card mb-4">
+        <div class="card-header">Pricing</div>
+        <div class="card-body">
+          <label class="form-label">Charge for access?</label>
+          <select name="pricing_plan_id" class="form-select" id="pricingPlanSelect">
+            <option value="">Free — no charge</option>
+            <?php $__currentLoopData = $pricingPlans; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $plan): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+              <option value="<?php echo e($plan->id); ?>"
+                data-resource-type="<?php echo e($plan->resource_type); ?>"
+                <?php echo e(old('pricing_plan_id') == $plan->id ? 'selected' : ''); ?>>
+                <?php echo e($plan->name); ?> — <?php echo e($plan->currency); ?> <?php echo e(number_format($plan->amount, 2)); ?>
+
+                <?php if($plan->resource_type): ?> (<?php echo e(\App\Models\LibraryPricingPlan::RESOURCE_TYPES[$plan->resource_type] ?? $plan->resource_type); ?> only) <?php endif; ?>
+              </option>
+            <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+          </select>
+          <div class="form-text">
+            Plans are managed under <a href="<?php echo e(route('library.pricing-plans.index')); ?>">Pricing Plans</a>.
+            A plan scoped to one resource type can only be selected for that type.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
         <div class="card-header">File</div>
         <div class="card-body row g-3">
           <div class="col-md-8">
@@ -108,6 +131,28 @@
     </form>
 
   </div>
+
+  <script>
+    (function () {
+      var typeSelect = document.querySelector('select[name="resource_type"]');
+      var planSelect = document.getElementById('pricingPlanSelect');
+      if (!typeSelect || !planSelect) return;
+
+      function filterPlans() {
+        var type = typeSelect.value;
+        Array.from(planSelect.options).forEach(function (opt) {
+          var scoped = opt.dataset ? opt.dataset.resourceType : '';
+          if (!opt.value) return; // "Free" option always visible
+          var mismatched = scoped && scoped !== type;
+          opt.hidden = mismatched;
+          if (mismatched && opt.selected) planSelect.value = '';
+        });
+      }
+
+      typeSelect.addEventListener('change', filterPlans);
+      filterPlans();
+    })();
+  </script>
 
  <?php echo $__env->renderComponent(); ?>
 <?php endif; ?>
