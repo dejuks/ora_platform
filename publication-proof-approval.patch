@@ -1,0 +1,408 @@
+diff --git a/app/Http/Controllers/Journal/ManuscriptController.php b/app/Http/Controllers/Journal/ManuscriptController.php
+index 7419c55..fb1b548 100644
+--- a/app/Http/Controllers/Journal/ManuscriptController.php
++++ b/app/Http/Controllers/Journal/ManuscriptController.php
+@@ -533,6 +533,109 @@ public function decide(Request $request, Manuscript $manuscript)
+         return back()->with('success', 'Decision recorded.');
+     }
+ 
++    /**
++     * Journal Manager: once the Article Processing Charge is settled,
++     * send the final, fully-typeset publication proof (the actual
++     * document that will go live) to the corresponding author for
++     * their review — before it's published, not after.
++     */
++    public function sendProof(Request $request, Manuscript $manuscript)
++    {
++        $this->authorizePermission('manage-workflow');
++
++        abort_unless($manuscript->status === 'accepted', 422, 'Only accepted manuscripts have a publication proof to send.');
++
++        abort_unless(
++            $manuscript->isFeeSettled(),
++            422,
++            'The publication fee has not been paid yet. The author must complete payment before a proof can be sent.'
++        );
++
++        $data = $request->validate([
++            'proof_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
++            'proof_message' => ['nullable', 'string'],
++        ]);
++
++        if ($manuscript->proof_file) {
++            Storage::disk('public')->delete($manuscript->proof_file);
++        }
++
++        $manuscript->update([
++            'proof_file' => $request->file('proof_file')->store('manuscript-proofs', 'public'),
++            'proof_message' => $data['proof_message'] ?? null,
++            'proof_status' => 'sent',
++            'proof_feedback' => null,
++            'proof_sent_by' => Auth::id(),
++            'proof_sent_at' => now(),
++            'proof_responded_at' => null,
++            'updated_by' => Auth::id(),
++        ]);
++
++        $manuscript->author?->notify(new AppNotification(
++            title: 'Publication proof ready for your review',
++            message: "The final publication proof for \"{$manuscript->title}\" is ready. "
++                .'Please review the full document and approve it, or leave comments if changes are needed.',
++            url: route('journal.manuscripts.show', $manuscript),
++            icon: 'bi-file-earmark-check',
++            type: 'info',
++        ));
++
++        return back()->with('success', 'Publication proof sent to the author for approval.');
++    }
++
++    /**
++     * Author: review the publication proof and either approve it
++     * (unblocking publish()) or send comments back to the Journal
++     * Manager, who revises and re-sends via sendProof() above.
++     */
++    public function respondToProof(Request $request, Manuscript $manuscript)
++    {
++        abort_unless($manuscript->author_id === Auth::id(), 403, 'Only the corresponding author can respond to the publication proof.');
++
++        abort_unless($manuscript->isProofAwaitingAuthor(), 422, 'There is no publication proof currently awaiting your review.');
++
++        $data = $request->validate([
++            'decision' => ['required', 'in:approved,changes_requested'],
++            'feedback' => ['required_if:decision,changes_requested', 'nullable', 'string'],
++        ]);
++
++        $manuscript->update([
++            'proof_status' => $data['decision'],
++            'proof_feedback' => $data['feedback'] ?? null,
++            'proof_responded_at' => now(),
++            'updated_by' => Auth::id(),
++        ]);
++
++        $notification = $data['decision'] === 'approved'
++            ? [
++                'title' => 'Publication proof approved',
++                'message' => "The author approved the publication proof for \"{$manuscript->title}\". It's ready to publish.",
++                'icon' => 'bi-check-circle',
++                'type' => 'success',
++            ]
++            : [
++                'title' => 'Changes requested on publication proof',
++                'message' => "The author requested changes to the publication proof for \"{$manuscript->title}\".",
++                'icon' => 'bi-chat-left-text',
++                'type' => 'warning',
++            ];
++
++        $this->notifyPermissionHolders('journal', 'manage-workflow', new AppNotification(
++            title: $notification['title'],
++            message: $notification['message'],
++            url: route('journal.manuscripts.show', $manuscript),
++            icon: $notification['icon'],
++            type: $notification['type'],
++        ));
++
++        return back()->with(
++            'success',
++            $data['decision'] === 'approved'
++                ? 'Thanks — you approved the publication proof.'
++                : 'Your comments were sent to the Journal Manager.'
++        );
++    }
++
+     /**
+      * Journal Manager / EIC: publish an accepted manuscript and mint
+      * its DOI. (Placeholder DOI format — swap in a real Crossref/DOI
+@@ -550,6 +653,12 @@ public function publish(Manuscript $manuscript)
+             'The publication fee has not been paid yet. The author must complete payment before this manuscript can be published.'
+         );
+ 
++        abort_unless(
++            $manuscript->isProofApproved(),
++            422,
++            'The author has not approved the publication proof yet. Send the proof and wait for their approval before publishing.'
++        );
++
+         $manuscript->update([
+             'status' => 'published',
+             'doi' => $manuscript->doi ?: '10.0000/ora.journal.'.Str::padLeft((string) $manuscript->id, 6, '0'),
+diff --git a/app/Models/Manuscript.php b/app/Models/Manuscript.php
+index 1c90a07..c3edc61 100644
+--- a/app/Models/Manuscript.php
++++ b/app/Models/Manuscript.php
+@@ -24,6 +24,13 @@ class Manuscript extends Model
+         'publication_fee',
+         'payment_status',
+         'fee_paid_at',
++        'proof_file',
++        'proof_status',
++        'proof_message',
++        'proof_feedback',
++        'proof_sent_by',
++        'proof_sent_at',
++        'proof_responded_at',
+         'submitted_at',
+         'decided_at',
+         'published_at',
+@@ -38,6 +45,8 @@ protected function casts(): array
+             'decided_at' => 'datetime',
+             'published_at' => 'datetime',
+             'fee_paid_at' => 'datetime',
++            'proof_sent_at' => 'datetime',
++            'proof_responded_at' => 'datetime',
+             'publication_fee' => 'decimal:2',
+         ];
+     }
+@@ -211,6 +220,46 @@ public function isFeeSettled(): bool
+         return $this->publication_fee <= 0 || in_array($this->payment_status, ['paid', 'waived']);
+     }
+ 
++    /**
++     * Every state the publication proof can be in.
++     */
++    public const PROOF_STATUSES = [
++        'not_sent' => 'Not Sent',
++        'sent' => 'Awaiting Author Review',
++        'approved' => 'Approved by Author',
++        'changes_requested' => 'Changes Requested',
++    ];
++
++    public function proofSentBy()
++    {
++        return $this->belongsTo(User::class, 'proof_sent_by');
++    }
++
++    public function proofStatusLabel(): string
++    {
++        return self::PROOF_STATUSES[$this->proof_status] ?? $this->proof_status;
++    }
++
++    /**
++     * The single gate publish() checks in addition to the fee: the
++     * author must have read the final publication proof and approved
++     * it (as opposed to it never being sent, still sitting with the
++     * author, or having been kicked back with change requests).
++     */
++    public function isProofApproved(): bool
++    {
++        return $this->proof_status === 'approved';
++    }
++
++    /**
++     * The proof is currently sitting with the author, waiting on
++     * their approval or comments.
++     */
++    public function isProofAwaitingAuthor(): bool
++    {
++        return $this->proof_status === 'sent';
++    }
++
+     /*
+     |--------------------------------------------------------------------------
+     | Scopes
+diff --git a/database/migrations/2026_08_04_000000_add_proof_review_fields_to_manuscripts_table.php b/database/migrations/2026_08_04_000000_add_proof_review_fields_to_manuscripts_table.php
+new file mode 100644
+index 0000000..b4c9788
+--- /dev/null
++++ b/database/migrations/2026_08_04_000000_add_proof_review_fields_to_manuscripts_table.php
+@@ -0,0 +1,60 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * The final gate before publish(): once the Article Processing
++     * Charge is settled, the Journal Manager sends the fully-typeset
++     * publication proof (the actual document that will go live) to
++     * the corresponding author. The author reads it and either
++     * approves it as-is, or sends comments back and the Manager
++     * revises and re-sends. Only an 'approved' proof lets the
++     * Manager's publish() button fire — this is independent of
++     * manuscript.status, the same way payment_status is, so it can
++     * be re-sent/re-reviewed without disturbing the 'accepted' status.
++     */
++    public function up(): void
++    {
++        Schema::table('manuscripts', function (Blueprint $table) {
++
++            $table->string('proof_file')->nullable()->after('doi');
++
++            $table->string('proof_status')->default('not_sent')->after('proof_file');
++            // not_sent, sent, approved, changes_requested
++
++            $table->text('proof_message')->nullable()->after('proof_status');
++            // Manager's note to the author when the proof was sent.
++
++            $table->text('proof_feedback')->nullable()->after('proof_message');
++            // Author's comments, when they request changes instead of approving.
++
++            $table->foreignId('proof_sent_by')
++                ->nullable()
++                ->after('proof_feedback')
++                ->constrained('users')
++                ->nullOnDelete();
++
++            $table->timestamp('proof_sent_at')->nullable()->after('proof_sent_by');
++            $table->timestamp('proof_responded_at')->nullable()->after('proof_sent_at');
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::table('manuscripts', function (Blueprint $table) {
++            $table->dropConstrainedForeignId('proof_sent_by');
++            $table->dropColumn([
++                'proof_file',
++                'proof_status',
++                'proof_message',
++                'proof_feedback',
++                'proof_sent_at',
++                'proof_responded_at',
++            ]);
++        });
++    }
++};
+diff --git a/resources/views/modules/journal/manuscripts/show.blade.php b/resources/views/modules/journal/manuscripts/show.blade.php
+index 5d96f13..ed2f23c 100644
+--- a/resources/views/modules/journal/manuscripts/show.blade.php
++++ b/resources/views/modules/journal/manuscripts/show.blade.php
+@@ -234,25 +234,113 @@
+           </div>
+         @endif
+ 
++        {{-- AUTHOR: Review & Approve the Publication Proof --}}
++        @if($manuscript->author_id === $user->id && $manuscript->isProofAwaitingAuthor())
++          <div class="card mb-4 border-warning">
++            <div class="card-header bg-warning-subtle"><strong>Action Needed: Review Your Publication Proof</strong></div>
++            <div class="card-body">
++              <p class="mb-3">
++                The Journal Manager has sent the final publication document for your review.
++                Please read it in full before approving — this is exactly what will be published
++                and assigned a DOI.
++              </p>
++              @if($manuscript->proof_message)
++                <p class="text-muted"><strong>Note from the Journal Manager:</strong> {{ $manuscript->proof_message }}</p>
++              @endif
++              @if($manuscript->proof_file)
++                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->proof_file) }}" target="_blank" class="btn btn-outline-primary mb-3">
++                  <i class="bi bi-file-earmark-pdf"></i> View Full Publication Document
++                </a>
++              @endif
++              <form action="{{ route('journal.manuscripts.proof.respond', $manuscript) }}" method="POST">
++                @csrf
++                <div class="mb-3">
++                  <label class="form-label">Comments (required if requesting changes)</label>
++                  <textarea name="feedback" class="form-control" rows="3"
++                            placeholder="Anything that needs fixing before this can go live"></textarea>
++                </div>
++                <button type="submit" name="decision" value="approved" class="btn btn-success">
++                  <i class="bi bi-check-circle"></i> Approve for Publication
++                </button>
++                <button type="submit" name="decision" value="changes_requested" class="btn btn-outline-warning">
++                  <i class="bi bi-chat-left-text"></i> Request Changes
++                </button>
++              </form>
++            </div>
++          </div>
++        @endif
++
++        @if($manuscript->author_id === $user->id && $manuscript->proof_status === 'changes_requested')
++          <div class="alert alert-info">
++            <i class="bi bi-hourglass-split"></i>
++            You requested changes to the publication proof. The Journal Manager will revise
++            it and send you an updated version to review.
++          </div>
++        @endif
++
++        {{-- JOURNAL MANAGER / EIC: Send the Publication Proof --}}
++        @if($canPublish && $manuscript->status === 'accepted' && $manuscript->isFeeSettled() && ! $manuscript->isProofApproved())
++          <div class="card mb-4">
++            <div class="card-header"><strong>Publication Proof</strong></div>
++            <div class="card-body">
++              @if($manuscript->proof_status !== 'not_sent')
++                <p class="mb-3">
++                  Status: <span class="badge bg-secondary">{{ $manuscript->proofStatusLabel() }}</span>
++                  @if($manuscript->proof_sent_at)
++                    · sent {{ $manuscript->proof_sent_at->format('M d, Y') }}
++                  @endif
++                </p>
++                @if($manuscript->proof_status === 'changes_requested' && $manuscript->proof_feedback)
++                  <div class="alert alert-warning">
++                    <strong>Author's comments:</strong> {{ $manuscript->proof_feedback }}
++                  </div>
++                @endif
++              @endif
++              <form action="{{ route('journal.manuscripts.proof.send', $manuscript) }}" method="POST" enctype="multipart/form-data">
++                @csrf
++                <div class="mb-3">
++                  <label class="form-label">Full Publication Document *</label>
++                  <input type="file" name="proof_file" class="form-control" accept=".pdf,.doc,.docx" required>
++                </div>
++                <div class="mb-3">
++                  <label class="form-label">Note to Author</label>
++                  <textarea name="proof_message" class="form-control" rows="2"
++                            placeholder="Anything the author should know before reviewing"></textarea>
++                </div>
++                <button type="submit" class="btn btn-primary">
++                  <i class="bi bi-send"></i>
++                  {{ $manuscript->proof_status === 'not_sent' ? 'Send Proof to Author' : 'Send Revised Proof to Author' }}
++                </button>
++              </form>
++            </div>
++          </div>
++        @endif
++
+         {{-- JOURNAL MANAGER / EIC: Publish --}}
+         @if($canPublish && $manuscript->status === 'accepted')
+           <div class="card mb-4">
+             <div class="card-header"><strong>Publish</strong></div>
+             <div class="card-body">
+-              @if($manuscript->isFeeSettled())
++              @if($manuscript->isFeeSettled() && $manuscript->isProofApproved())
+                 <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST">
+                   @csrf
+                   <button type="submit" class="btn btn-success">
+                     <i class="bi bi-globe"></i> Publish & Assign DOI
+                   </button>
+                 </form>
+-              @else
++              @elseif(! $manuscript->isFeeSettled())
+                 <p class="text-muted mb-0">
+                   <i class="bi bi-hourglass-split"></i>
+                   Waiting on the author's publication fee
+                   ({{ \App\Models\JournalSetting::current()->currency }} {{ number_format($manuscript->publication_fee, 2) }})
+                   before this can be published.
+                 </p>
++              @else
++                <p class="text-muted mb-0">
++                  <i class="bi bi-hourglass-split"></i>
++                  Waiting on the author to approve the publication proof
++                  ({{ $manuscript->proofStatusLabel() }}) before this can be published.
++                </p>
+               @endif
+             </div>
+           </div>
+diff --git a/routes/web.php b/routes/web.php
+index 07d45cd..1116321 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -576,6 +576,16 @@
+             Route::post('manuscripts/{manuscript}/decide', [JournalManuscriptController::class, 'decide'])
+                 ->name('manuscripts.decide');
+ 
++            // Publication proof: once the APC is paid, the Journal
++            // Manager sends the final typeset document to the author
++            // for approval before publish() will fire (see publish()
++            // below, which is gated on proof_status === 'approved').
++            Route::post('manuscripts/{manuscript}/proof/send', [JournalManuscriptController::class, 'sendProof'])
++                ->name('manuscripts.proof.send');
++
++            Route::post('manuscripts/{manuscript}/proof/respond', [JournalManuscriptController::class, 'respondToProof'])
++                ->name('manuscripts.proof.respond');
++
+             Route::post('manuscripts/{manuscript}/publish', [JournalManuscriptController::class, 'publish'])
+                 ->name('manuscripts.publish');
+ 

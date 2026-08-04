@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Library;
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
 use App\Models\LibraryBookCopy;
+use App\Models\LibraryBranch;
 use App\Models\LibraryCategory;
 use App\Notifications\AppNotification;
 use App\Support\NotifiesPermissionHolders;
@@ -117,9 +118,11 @@ class BookController extends Controller
 
     public function show(LibraryBook $book)
     {
-        $book->load(['catalogedBy', 'approvedBy', 'category', 'copies', 'holds.member.user']);
+        $book->load(['catalogedBy', 'approvedBy', 'category', 'copies.branch', 'holds.member.user']);
 
-        return view('modules.library.books.show', compact('book'));
+        $branches = $this->accessibleBranches();
+
+        return view('modules.library.books.show', compact('book', 'branches'));
     }
 
     public function edit(LibraryBook $book)
@@ -199,11 +202,14 @@ class BookController extends Controller
         $this->authorizePermission('manage-inventory');
 
         $data = $request->validate([
+            'branch_id' => ['required', 'exists:library_branches,id'],
             'barcode' => ['nullable', 'string', 'max:64', 'unique:library_book_copies,barcode'],
             'shelf_location' => ['nullable', 'string', 'max:64'],
             'condition' => ['required', 'in:good,worn,damaged'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        abort_unless(Auth::user()->canAccessLibraryBranch((int) $data['branch_id']), 403, 'You are not assigned to that branch.');
 
         $data['library_book_id'] = $book->id;
         $data['barcode'] = $data['barcode'] ?: strtoupper('LB-'.$book->id.'-'.Str::random(6));
@@ -224,13 +230,22 @@ class BookController extends Controller
     {
         $this->authorizePermission('manage-inventory');
 
+        abort_unless(Auth::user()->canAccessLibraryBranch($copy->branch_id), 403, 'You are not assigned to this copy\'s branch.');
+
         $data = $request->validate([
             'status' => ['required', 'in:available,lost,damaged,withdrawn'],
             'condition' => ['nullable', 'in:good,worn,damaged'],
+            'branch_id' => ['nullable', 'exists:library_branches,id'],
             'notes' => ['nullable', 'string'],
         ]);
 
         abort_if($copy->status === 'on_loan' && $data['status'] === 'available', 422, 'This copy is currently on loan.');
+
+        if (! empty($data['branch_id'])) {
+            abort_unless(Auth::user()->canAccessLibraryBranch((int) $data['branch_id']), 403, 'You are not assigned to the destination branch.');
+        } else {
+            unset($data['branch_id']);
+        }
 
         $data['updated_by'] = Auth::id();
 
@@ -249,7 +264,20 @@ class BookController extends Controller
     {
         $this->authorizePermission('manage-inventory');
 
-        $query = LibraryBookCopy::with('book')->latest();
+        $user = Auth::user();
+        $accessibleBranchIds = $user->accessibleLibraryBranchIds();
+
+        $query = LibraryBookCopy::with(['book', 'branch']);
+
+        if ($accessibleBranchIds !== null) {
+            $query->whereIn('branch_id', $accessibleBranchIds);
+        }
+
+        if ($request->filled('branch')) {
+            $query->where('branch_id', $request->get('branch'));
+        }
+
+        $query->latest();
 
         if ($request->filled('status')) {
             $query->where('status', $request->get('status'));
@@ -265,7 +293,11 @@ class BookController extends Controller
 
         $copies = $query->paginate(20)->withQueryString();
 
-        return view('modules.library.copies.index', compact('copies'));
+        $branches = $accessibleBranchIds === null
+            ? LibraryBranch::active()->orderBy('name')->get()
+            : LibraryBranch::whereIn('id', $accessibleBranchIds)->orderBy('name')->get();
+
+        return view('modules.library.copies.index', compact('copies', 'branches'));
     }
 
     /*
@@ -273,6 +305,15 @@ class BookController extends Controller
     | Authorization helpers
     |--------------------------------------------------------------------------
     */
+
+    protected function accessibleBranches()
+    {
+        $ids = Auth::user()->accessibleLibraryBranchIds();
+
+        return $ids === null
+            ? LibraryBranch::active()->orderBy('name')->get()
+            : LibraryBranch::whereIn('id', $ids)->orderBy('name')->get();
+    }
 
     protected function authorizePermission(string $permission): void
     {

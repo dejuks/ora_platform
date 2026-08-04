@@ -115,6 +115,7 @@
             <input type="hidden" name="category" value="{{ request('category') }}">
             <input type="hidden" name="letter" value="{{ request('letter') }}">
             <input type="hidden" name="sort" value="{{ request('sort') }}">
+            <input type="hidden" name="branch" value="{{ request('branch') }}">
             <div class="input-group">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                 <input type="text" name="q" class="form-control" placeholder="Search by title, author, subject, or ISBN…"
@@ -168,6 +169,24 @@
                     @endforeach
                 </ul>
 
+                <p class="sidebar-heading mt-4">Branch</p>
+                <ul class="cat-list">
+                    <li>
+                        <a href="{{ request()->fullUrlWithQuery(['branch' => null]) }}"
+                           class="{{ !request('branch') ? 'is-active' : '' }}">
+                            <span>All branches</span>
+                        </a>
+                    </li>
+                    @foreach ($branches as $branch)
+                        <li>
+                            <a href="{{ request()->fullUrlWithQuery(['branch' => $branch->id]) }}"
+                               class="{{ (string) request('branch') === (string) $branch->id ? 'is-active' : '' }}">
+                                <span>{{ $branch->locationLabel() }}</span>
+                            </a>
+                        </li>
+                    @endforeach
+                </ul>
+
                 <p class="sidebar-heading">Sort</p>
                 <ul class="cat-list">
                     @foreach (['az' => 'Title A–Z', 'za' => 'Title Z–A', 'latest' => 'Newest first'] as $key => $label)
@@ -194,6 +213,11 @@
                                     <span class="badge {{ $book->available_copies_count > 0 ? 'badge-available' : 'badge-unavailable' }} mb-2">
                                         {{ $book->available_copies_count > 0 ? $book->available_copies_count.' available' : 'All copies checked out' }}
                                     </span>
+                                    @if(request('branch') && isset($book->available_at_branch_count))
+                                        <span class="badge {{ $book->available_at_branch_count > 0 ? 'badge-available' : 'badge-unavailable' }} mb-2">
+                                            {{ $book->available_at_branch_count }} at this branch
+                                        </span>
+                                    @endif
                                     @if($book->category)
                                         <span class="badge badge-category mb-2">{{ $book->category->name }}</span>
                                     @endif

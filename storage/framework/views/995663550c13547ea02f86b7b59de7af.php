@@ -115,6 +115,7 @@
             <input type="hidden" name="category" value="<?php echo e(request('category')); ?>">
             <input type="hidden" name="letter" value="<?php echo e(request('letter')); ?>">
             <input type="hidden" name="sort" value="<?php echo e(request('sort')); ?>">
+            <input type="hidden" name="branch" value="<?php echo e(request('branch')); ?>">
             <div class="input-group">
                 <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
                 <input type="text" name="q" class="form-control" placeholder="Search by title, author, subject, or ISBN…"
@@ -168,6 +169,24 @@
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </ul>
 
+                <p class="sidebar-heading mt-4">Branch</p>
+                <ul class="cat-list">
+                    <li>
+                        <a href="<?php echo e(request()->fullUrlWithQuery(['branch' => null])); ?>"
+                           class="<?php echo e(!request('branch') ? 'is-active' : ''); ?>">
+                            <span>All branches</span>
+                        </a>
+                    </li>
+                    <?php $__currentLoopData = $branches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $branch): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <li>
+                            <a href="<?php echo e(request()->fullUrlWithQuery(['branch' => $branch->id])); ?>"
+                               class="<?php echo e((string) request('branch') === (string) $branch->id ? 'is-active' : ''); ?>">
+                                <span><?php echo e($branch->locationLabel()); ?></span>
+                            </a>
+                        </li>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </ul>
+
                 <p class="sidebar-heading">Sort</p>
                 <ul class="cat-list">
                     <?php $__currentLoopData = ['az' => 'Title A–Z', 'za' => 'Title Z–A', 'latest' => 'Newest first']; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $key => $label): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
@@ -195,6 +214,11 @@
                                         <?php echo e($book->available_copies_count > 0 ? $book->available_copies_count.' available' : 'All copies checked out'); ?>
 
                                     </span>
+                                    <?php if(request('branch') && isset($book->available_at_branch_count)): ?>
+                                        <span class="badge <?php echo e($book->available_at_branch_count > 0 ? 'badge-available' : 'badge-unavailable'); ?> mb-2">
+                                            <?php echo e($book->available_at_branch_count); ?> at this branch
+                                        </span>
+                                    <?php endif; ?>
                                     <?php if($book->category): ?>
                                         <span class="badge badge-category mb-2"><?php echo e($book->category->name); ?></span>
                                     <?php endif; ?>

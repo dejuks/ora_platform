@@ -128,6 +128,19 @@ public function libraryMember()
 }
 
 /**
+ * Physical Library: the branch(es) this staff member is explicitly
+ * scoped to (Cataloger, Inventory Manager, Librarian (Physical),
+ * Acquisition Officer). See canAccessLibraryBranch() — having zero
+ * rows here means "every branch", not "no branches".
+ */
+public function libraryBranches()
+{
+    return $this->belongsToMany(LibraryBranch::class, 'library_branch_staff', 'user_id', 'branch_id')
+        ->withPivot('assigned_by')
+        ->withTimestamps();
+}
+
+/**
  * Digital Bookstore: every purchase this reader has made, completed
  * or otherwise. See EbookOrder / "My Digital Library".
  */
@@ -205,5 +218,63 @@ public function rolesInModule(string $moduleCode)
     return $this->moduleRoles()
         ->whereHas('module', fn ($q) => $q->where('code', $moduleCode))
         ->get();
+}
+
+/*
+|--------------------------------------------------------------------------
+| Physical Library branch scoping
+|--------------------------------------------------------------------------
+|
+| A Library Manager (manage-settings/manage-users) or Super Admin
+| always has every branch, full stop. Everyone else is "unscoped"
+| (every branch) until the Library Manager explicitly assigns them
+| to one or more specific branches via library_branch_staff — at
+| that point they're limited to just those.
+|
+*/
+
+public function hasLibraryBranchScope(): bool
+{
+    return $this->libraryBranches()->exists();
+}
+
+public function canAccessLibraryBranch(?int $branchId): bool
+{
+    if (! $branchId) {
+        return true;
+    }
+
+    if (
+        $this->isSuperAdmin()
+        || $this->hasModulePermission('library', 'manage-settings')
+        || $this->hasModulePermission('library', 'manage-users')
+    ) {
+        return true;
+    }
+
+    if (! $this->hasLibraryBranchScope()) {
+        return true;
+    }
+
+    return $this->libraryBranches()->where('library_branches.id', $branchId)->exists();
+}
+
+/**
+ * IDs of every branch this user may act on — null means "all of
+ * them", so callers should treat null as "don't filter" rather than
+ * "match nothing".
+ */
+public function accessibleLibraryBranchIds(): ?array
+{
+    if (
+        $this->isSuperAdmin()
+        || $this->hasModulePermission('library', 'manage-settings')
+        || $this->hasModulePermission('library', 'manage-users')
+        || ! $this->hasLibraryBranchScope()
+    ) {
+        return null;
+    }
+
+    return $this->libraryBranches()->pluck('library_branches.id')->all();
 }
 }

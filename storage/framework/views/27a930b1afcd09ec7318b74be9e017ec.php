@@ -244,23 +244,114 @@
         <?php endif; ?>
 
         
+        <?php if($manuscript->author_id === $user->id && $manuscript->isProofAwaitingAuthor()): ?>
+          <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning-subtle"><strong>Action Needed: Review Your Publication Proof</strong></div>
+            <div class="card-body">
+              <p class="mb-3">
+                The Journal Manager has sent the final publication document for your review.
+                Please read it in full before approving — this is exactly what will be published
+                and assigned a DOI.
+              </p>
+              <?php if($manuscript->proof_message): ?>
+                <p class="text-muted"><strong>Note from the Journal Manager:</strong> <?php echo e($manuscript->proof_message); ?></p>
+              <?php endif; ?>
+              <?php if($manuscript->proof_file): ?>
+                <a href="<?php echo e(\Illuminate\Support\Facades\Storage::url($manuscript->proof_file)); ?>" target="_blank" class="btn btn-outline-primary mb-3">
+                  <i class="bi bi-file-earmark-pdf"></i> View Full Publication Document
+                </a>
+              <?php endif; ?>
+              <form action="<?php echo e(route('journal.manuscripts.proof.respond', $manuscript)); ?>" method="POST">
+                <?php echo csrf_field(); ?>
+                <div class="mb-3">
+                  <label class="form-label">Comments (required if requesting changes)</label>
+                  <textarea name="feedback" class="form-control" rows="3"
+                            placeholder="Anything that needs fixing before this can go live"></textarea>
+                </div>
+                <button type="submit" name="decision" value="approved" class="btn btn-success">
+                  <i class="bi bi-check-circle"></i> Approve for Publication
+                </button>
+                <button type="submit" name="decision" value="changes_requested" class="btn btn-outline-warning">
+                  <i class="bi bi-chat-left-text"></i> Request Changes
+                </button>
+              </form>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <?php if($manuscript->author_id === $user->id && $manuscript->proof_status === 'changes_requested'): ?>
+          <div class="alert alert-info">
+            <i class="bi bi-hourglass-split"></i>
+            You requested changes to the publication proof. The Journal Manager will revise
+            it and send you an updated version to review.
+          </div>
+        <?php endif; ?>
+
+        
+        <?php if($canPublish && $manuscript->status === 'accepted' && $manuscript->isFeeSettled() && ! $manuscript->isProofApproved()): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Publication Proof</strong></div>
+            <div class="card-body">
+              <?php if($manuscript->proof_status !== 'not_sent'): ?>
+                <p class="mb-3">
+                  Status: <span class="badge bg-secondary"><?php echo e($manuscript->proofStatusLabel()); ?></span>
+                  <?php if($manuscript->proof_sent_at): ?>
+                    · sent <?php echo e($manuscript->proof_sent_at->format('M d, Y')); ?>
+
+                  <?php endif; ?>
+                </p>
+                <?php if($manuscript->proof_status === 'changes_requested' && $manuscript->proof_feedback): ?>
+                  <div class="alert alert-warning">
+                    <strong>Author's comments:</strong> <?php echo e($manuscript->proof_feedback); ?>
+
+                  </div>
+                <?php endif; ?>
+              <?php endif; ?>
+              <form action="<?php echo e(route('journal.manuscripts.proof.send', $manuscript)); ?>" method="POST" enctype="multipart/form-data">
+                <?php echo csrf_field(); ?>
+                <div class="mb-3">
+                  <label class="form-label">Full Publication Document *</label>
+                  <input type="file" name="proof_file" class="form-control" accept=".pdf,.doc,.docx" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Note to Author</label>
+                  <textarea name="proof_message" class="form-control" rows="2"
+                            placeholder="Anything the author should know before reviewing"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-send"></i>
+                  <?php echo e($manuscript->proof_status === 'not_sent' ? 'Send Proof to Author' : 'Send Revised Proof to Author'); ?>
+
+                </button>
+              </form>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        
         <?php if($canPublish && $manuscript->status === 'accepted'): ?>
           <div class="card mb-4">
             <div class="card-header"><strong>Publish</strong></div>
             <div class="card-body">
-              <?php if($manuscript->isFeeSettled()): ?>
+              <?php if($manuscript->isFeeSettled() && $manuscript->isProofApproved()): ?>
                 <form action="<?php echo e(route('journal.manuscripts.publish', $manuscript)); ?>" method="POST">
                   <?php echo csrf_field(); ?>
                   <button type="submit" class="btn btn-success">
                     <i class="bi bi-globe"></i> Publish & Assign DOI
                   </button>
                 </form>
-              <?php else: ?>
+              <?php elseif(! $manuscript->isFeeSettled()): ?>
                 <p class="text-muted mb-0">
                   <i class="bi bi-hourglass-split"></i>
                   Waiting on the author's publication fee
                   (<?php echo e(\App\Models\JournalSetting::current()->currency); ?> <?php echo e(number_format($manuscript->publication_fee, 2)); ?>)
                   before this can be published.
+                </p>
+              <?php else: ?>
+                <p class="text-muted mb-0">
+                  <i class="bi bi-hourglass-split"></i>
+                  Waiting on the author to approve the publication proof
+                  (<?php echo e($manuscript->proofStatusLabel()); ?>) before this can be published.
                 </p>
               <?php endif; ?>
             </div>

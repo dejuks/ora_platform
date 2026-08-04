@@ -534,6 +534,109 @@ class ManuscriptController extends Controller
     }
 
     /**
+     * Journal Manager: once the Article Processing Charge is settled,
+     * send the final, fully-typeset publication proof (the actual
+     * document that will go live) to the corresponding author for
+     * their review — before it's published, not after.
+     */
+    public function sendProof(Request $request, Manuscript $manuscript)
+    {
+        $this->authorizePermission('manage-workflow');
+
+        abort_unless($manuscript->status === 'accepted', 422, 'Only accepted manuscripts have a publication proof to send.');
+
+        abort_unless(
+            $manuscript->isFeeSettled(),
+            422,
+            'The publication fee has not been paid yet. The author must complete payment before a proof can be sent.'
+        );
+
+        $data = $request->validate([
+            'proof_file' => ['required', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
+            'proof_message' => ['nullable', 'string'],
+        ]);
+
+        if ($manuscript->proof_file) {
+            Storage::disk('public')->delete($manuscript->proof_file);
+        }
+
+        $manuscript->update([
+            'proof_file' => $request->file('proof_file')->store('manuscript-proofs', 'public'),
+            'proof_message' => $data['proof_message'] ?? null,
+            'proof_status' => 'sent',
+            'proof_feedback' => null,
+            'proof_sent_by' => Auth::id(),
+            'proof_sent_at' => now(),
+            'proof_responded_at' => null,
+            'updated_by' => Auth::id(),
+        ]);
+
+        $manuscript->author?->notify(new AppNotification(
+            title: 'Publication proof ready for your review',
+            message: "The final publication proof for \"{$manuscript->title}\" is ready. "
+                .'Please review the full document and approve it, or leave comments if changes are needed.',
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: 'bi-file-earmark-check',
+            type: 'info',
+        ));
+
+        return back()->with('success', 'Publication proof sent to the author for approval.');
+    }
+
+    /**
+     * Author: review the publication proof and either approve it
+     * (unblocking publish()) or send comments back to the Journal
+     * Manager, who revises and re-sends via sendProof() above.
+     */
+    public function respondToProof(Request $request, Manuscript $manuscript)
+    {
+        abort_unless($manuscript->author_id === Auth::id(), 403, 'Only the corresponding author can respond to the publication proof.');
+
+        abort_unless($manuscript->isProofAwaitingAuthor(), 422, 'There is no publication proof currently awaiting your review.');
+
+        $data = $request->validate([
+            'decision' => ['required', 'in:approved,changes_requested'],
+            'feedback' => ['required_if:decision,changes_requested', 'nullable', 'string'],
+        ]);
+
+        $manuscript->update([
+            'proof_status' => $data['decision'],
+            'proof_feedback' => $data['feedback'] ?? null,
+            'proof_responded_at' => now(),
+            'updated_by' => Auth::id(),
+        ]);
+
+        $notification = $data['decision'] === 'approved'
+            ? [
+                'title' => 'Publication proof approved',
+                'message' => "The author approved the publication proof for \"{$manuscript->title}\". It's ready to publish.",
+                'icon' => 'bi-check-circle',
+                'type' => 'success',
+            ]
+            : [
+                'title' => 'Changes requested on publication proof',
+                'message' => "The author requested changes to the publication proof for \"{$manuscript->title}\".",
+                'icon' => 'bi-chat-left-text',
+                'type' => 'warning',
+            ];
+
+        $this->notifyPermissionHolders('journal', 'manage-workflow', new AppNotification(
+            title: $notification['title'],
+            message: $notification['message'],
+            url: route('journal.manuscripts.show', $manuscript),
+            icon: $notification['icon'],
+            type: $notification['type'],
+        ));
+
+        return back()->with(
+            'success',
+            $data['decision'] === 'approved'
+                ? 'Thanks — you approved the publication proof.'
+                : 'Your comments were sent to the Journal Manager.'
+        );
+    }
+
+    /**
      * Journal Manager / EIC: publish an accepted manuscript and mint
      * its DOI. (Placeholder DOI format — swap in a real Crossref/DOI
      * registration call here when that integration is built.)
@@ -548,6 +651,12 @@ class ManuscriptController extends Controller
             $manuscript->isFeeSettled(),
             422,
             'The publication fee has not been paid yet. The author must complete payment before this manuscript can be published.'
+        );
+
+        abort_unless(
+            $manuscript->isProofApproved(),
+            422,
+            'The author has not approved the publication proof yet. Send the proof and wait for their approval before publishing.'
         );
 
         $manuscript->update([

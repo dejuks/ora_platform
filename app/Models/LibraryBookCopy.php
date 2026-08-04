@@ -11,6 +11,7 @@ class LibraryBookCopy extends Model
 
     protected $fillable = [
         'library_book_id',
+        'branch_id',
         'barcode',
         'shelf_location',
         'condition',
@@ -48,6 +49,11 @@ class LibraryBookCopy extends Model
         return $this->belongsTo(LibraryBook::class, 'library_book_id');
     }
 
+    public function branch()
+    {
+        return $this->belongsTo(LibraryBranch::class, 'branch_id');
+    }
+
     public function loans()
     {
         return $this->hasMany(LibraryLoan::class);
@@ -79,6 +85,11 @@ class LibraryBookCopy extends Model
         return self::STATUSES[$this->status] ?? $this->status;
     }
 
+    public function branchLabel(): string
+    {
+        return $this->branch?->locationLabel() ?? 'Unassigned';
+    }
+
     public function isAvailable(): bool
     {
         return $this->status === 'available';
@@ -93,5 +104,10 @@ class LibraryBookCopy extends Model
     public function scopeAvailable($query)
     {
         return $query->where('status', 'available');
+    }
+
+    public function scopeAtBranch($query, $branchId)
+    {
+        return $query->where('branch_id', $branchId);
     }
 }

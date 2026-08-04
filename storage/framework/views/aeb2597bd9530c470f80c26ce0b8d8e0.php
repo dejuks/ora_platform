@@ -122,6 +122,20 @@
             <?php if($canManageInventory): ?>
               <form action="<?php echo e(route('library.books.copies.store', $book)); ?>" method="POST" class="row g-2 mb-3">
                 <?php echo csrf_field(); ?>
+                <div class="col-12">
+                  <select name="branch_id" class="form-select form-select-sm" required>
+                    <option value="">Select branch…</option>
+                    <?php $__currentLoopData = $branches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $branch): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                      <option value="<?php echo e($branch->id); ?>"><?php echo e($branch->locationLabel()); ?></option>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                  </select>
+                  <?php if($branches->isEmpty()): ?>
+                    <div class="form-text text-warning">
+                      No branches available to you yet — ask the Library Manager to
+                      <a href="<?php echo e(route('library.branches.index')); ?>">create one</a> or assign you to one.
+                    </div>
+                  <?php endif; ?>
+                </div>
                 <div class="col-5">
                   <input type="text" name="barcode" class="form-control form-control-sm" placeholder="Barcode (auto if blank)">
                 </div>
@@ -147,6 +161,7 @@
               <thead>
                 <tr>
                   <th>Barcode</th>
+                  <th>Branch</th>
                   <th>Shelf</th>
                   <th>Status</th>
                   <th></th>
@@ -156,6 +171,7 @@
                 <?php $__empty_1 = true; $__currentLoopData = $book->copies; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $copy): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                   <tr>
                     <td><?php echo e($copy->barcode); ?></td>
+                    <td><?php echo e($copy->branchLabel()); ?></td>
                     <td><?php echo e($copy->shelf_location ?? '—'); ?></td>
                     <td>
                       <span class="badge <?php echo e($copy->status === 'available' ? 'bg-success' : ($copy->status === 'on_loan' ? 'bg-primary' : 'bg-secondary')); ?>">
@@ -182,7 +198,7 @@
                   </tr>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                   <tr>
-                    <td colspan="4" class="text-center text-muted py-3">No copies yet.</td>
+                    <td colspan="5" class="text-center text-muted py-3">No copies yet.</td>
                   </tr>
                 <?php endif; ?>
               </tbody>

@@ -96,6 +96,20 @@
                     <p><?php echo e($book->description); ?></p>
                 <?php endif; ?>
 
+                <?php if($copiesByBranch->isNotEmpty()): ?>
+                    <h5 class="mt-4">Availability by Branch</h5>
+                    <ul class="list-unstyled mb-0">
+                        <?php $__currentLoopData = $copiesByBranch; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                            <li class="d-flex justify-content-between border-bottom py-1">
+                                <span><?php echo e($row->branch?->locationLabel() ?? 'Unassigned'); ?></span>
+                                <span class="<?php echo e($row->available > 0 ? 'text-success' : 'text-muted'); ?>">
+                                    <?php echo e($row->available); ?> of <?php echo e($row->total); ?> available
+                                </span>
+                            </li>
+                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                    </ul>
+                <?php endif; ?>
+
                 <?php if($myHold): ?>
                     <div class="alert alert-info mt-3">
                         <i class="bi bi-bookmark-check"></i>
