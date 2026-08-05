@@ -155,8 +155,8 @@
 
             <div class="meta-grid">
                 <div class="meta-item">
-                    <span class="label">Author</span>
-                    <span class="value">{{ $manuscript->author->full_name }}</span>
+                    <span class="label">{{ $manuscript->coAuthors->isNotEmpty() ? 'Authors' : 'Author' }}</span>
+                    <span class="value">{{ $manuscript->byline() }}</span>
                 </div>
                 <div class="meta-item">
                     <span class="label">Published</span>
@@ -170,6 +170,18 @@
                 @endif
             </div>
 
+            @if($manuscript->coAuthors->isNotEmpty())
+                <div class="mb-4">
+                    <span class="section-label" style="font-size: 13px; display:block; margin-bottom:8px; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700;">Affiliations</span>
+                    <ul class="mb-0 ps-3">
+                        <li>{{ $manuscript->author->full_name }} (Corresponding Author)</li>
+                        @foreach($manuscript->coAuthors as $coAuthor)
+                            <li>{{ $coAuthor->full_name }}@if($coAuthor->affiliation), {{ $coAuthor->affiliation }}@endif</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
             @if($manuscript->keywords)
                 <div class="mb-4">
                     <span class="section-label" style="font-size: 13px; display:block; margin-bottom:8px; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700;">Keywords</span>
@@ -180,10 +192,18 @@
             @endif
 
             <h2 class="section-label">Abstract</h2>
-            <p class="abstract-text">{{ $manuscript->abstract }}</p>
+            {{-- Not {{ }} — the abstract is HTML from the manuscript's rich-text
+                 editor, already sanitized server-side with Purifier on save
+                 (see ManuscriptController). Escaping it here is what was
+                 printing literal <p> tags instead of rendering them. --}}
+            <div class="abstract-text">{!! $manuscript->abstract !!}</div>
 
-            @if($manuscript->manuscript_file)
-                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->manuscript_file) }}"
+            {{-- Deliberately publicFile(), never manuscript_file: the public
+                 copy must be the version the author approved (and, once
+                 published, the DOI-stamped version-of-record), not the
+                 blinded file that was only ever meant for reviewers. --}}
+            @if($manuscript->publicFile())
+                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->publicFile()) }}"
                    target="_blank" class="btn-navy mt-3">
                     <i class="bi bi-file-earmark-pdf"></i> Download Full Article
                 </a>

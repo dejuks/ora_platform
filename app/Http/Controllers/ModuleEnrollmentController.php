@@ -29,7 +29,13 @@ class ModuleEnrollmentController extends Controller
             ->pluck('pivot.module_id')
             ->unique();
 
-        $joined = $modules->whereIn('id', $joinedModuleIds);
+        $joined = $modules->whereIn('id', $joinedModuleIds)
+            ->each(function (Module $module) use ($user) {
+                // Only offer "Leave" where it's actually safe to act on
+                // with one click — see ModuleEnrollmentService::canLeave().
+                $module->can_leave = $this->enrollment->canLeave($user, $module);
+            });
+
         $available = $modules->whereNotIn('id', $joinedModuleIds);
 
         return view('modules.my-modules', compact('joined', 'available'));
@@ -50,5 +56,26 @@ class ModuleEnrollmentController extends Controller
         return redirect()
             ->route('my-modules')
             ->with('success', "You're now enrolled in {$module->name}.");
+    }
+
+    public function leave(string $moduleCode)
+    {
+        $user = Auth::user();
+
+        $module = Module::where('code', $moduleCode)->first();
+
+        if (! $module) {
+            return redirect()->route('my-modules')->with('error', 'That module does not exist.');
+        }
+
+        if (! $this->enrollment->leave($user, $moduleCode)) {
+            return redirect()
+                ->route('my-modules')
+                ->with('error', "You can't leave {$module->name} here — an administrator has granted you a role there beyond the default one. Contact an administrator if you need it removed.");
+        }
+
+        return redirect()
+            ->route('my-modules')
+            ->with('success', "You've left {$module->name}.");
     }
 }

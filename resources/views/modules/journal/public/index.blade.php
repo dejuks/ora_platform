@@ -213,11 +213,11 @@
                                     </a>
                                 </div>
                                 <p class="text-muted small mt-2 mb-2">
-                                    By {{ $article->author->full_name }} ·
+                                    By {{ $article->byline() }} ·
                                     {{ optional($article->published_at)->format('M d, Y') }}
                                 </p>
                                 <p class="small mb-3">
-                                    {{ \Illuminate\Support\Str::limit($article->abstract, 130) }}
+                                    {{ \Illuminate\Support\Str::limit(strip_tags($article->abstract), 130) }}
                                 </p>
                                 <a href="{{ route('journal.public.show', $article) }}" class="small">
                                     Read abstract <i class="bi bi-arrow-right"></i>

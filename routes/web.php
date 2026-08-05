@@ -32,7 +32,6 @@ use App\Http\Controllers\Journal\PublicController as JournalPublicController;
 use App\Http\Controllers\Journal\SettingsController as JournalSettingsController;
 use App\Http\Controllers\Journal\UserController as JournalUserController;
 use App\Http\Controllers\Library\BookController as LibraryBookController;
-use App\Http\Controllers\Library\BranchController as LibraryBranchController;
 use App\Http\Controllers\Library\CategoryController as LibraryCategoryController;
 use App\Http\Controllers\Library\CirculationController as LibraryCirculationController;
 use App\Http\Controllers\Library\CirculationPolicyController as LibraryCirculationPolicyController;
@@ -390,6 +389,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::post('/my-modules/{moduleCode}', [ModuleEnrollmentController::class, 'join'])
         ->name('my-modules.join');
+
+    Route::delete('/my-modules/{moduleCode}', [ModuleEnrollmentController::class, 'leave'])
+        ->name('my-modules.leave');
 
     /*
     |--------------------------------------------------------------------------
@@ -953,13 +955,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             // digital resource. Purchasing itself lives on the public
             // catalog — see 'library.public.digital.purchase' above.
             Route::resource('pricing-plans', LibraryPricingPlanController::class)->except('show');
-
-            // Library Manager (manage-settings): full CRUD over the
-            // physical locations (Jimma, Adama, Finfinnee, ...) plus
-            // which branch-scoped staff are assigned to each.
-            Route::resource('branches', LibraryBranchController::class)->except('show');
-            Route::post('branches/{branch}/staff', [LibraryBranchController::class, 'syncStaff'])
-                ->name('branches.staff');
         });
 
     /*

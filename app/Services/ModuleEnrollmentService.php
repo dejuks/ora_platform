@@ -45,7 +45,13 @@ class ModuleEnrollmentService
             return null;
         }
 
-        UserModuleRole::firstOrCreate(
+        // updateOrCreate, not firstOrCreate: someone who left this
+        // module before (is_active = false) and is now rejoining must
+        // actually be reactivated. firstOrCreate would find that old
+        // inactive row on the (user_id, module_id, role_id) match and
+        // hand it back unchanged, leaving them enrolled-but-invisible
+        // everywhere is_active is checked.
+        UserModuleRole::updateOrCreate(
             [
                 'user_id' => $user->id,
                 'module_id' => $module->id,
@@ -59,6 +65,65 @@ class ModuleEnrollmentService
         $this->afterEnroll($user, $module);
 
         return $module;
+    }
+
+    /**
+     * Self-service leave: revoke the entry-level role a user picked
+     * up through enroll()/enrollMany() above, for a module they're
+     * still permitted to leave (see canLeave()).
+     *
+     * Deliberately deactivates only that one default-role pivot row —
+     * never every role row the user holds in the module. If a Super
+     * Admin has since promoted them (Associate Editor, Journal
+     * Manager, etc.), that's a separate, admin-granted role and this
+     * self-service action must never quietly strip it.
+     *
+     * Returns true if an active enrollment was actually revoked,
+     * false if there was nothing to leave or leaving isn't allowed.
+     */
+    public function leave(User $user, string $moduleCode): bool
+    {
+        $module = Module::where('code', $moduleCode)->first();
+
+        if (! $module || ! $this->canLeave($user, $module)) {
+            return false;
+        }
+
+        $role = $module->defaultRole();
+
+        $updated = UserModuleRole::where('user_id', $user->id)
+            ->where('module_id', $module->id)
+            ->where('role_id', $role->id)
+            ->where('is_active', true)
+            ->update(['is_active' => false]);
+
+        return $updated > 0;
+    }
+
+    /**
+     * A user may only leave a module through this self-service page
+     * if the *only* active role they hold there is the module's own
+     * default (self-registration) role. The moment an admin has
+     * granted them anything else in that module — Associate Editor,
+     * Journal Manager, Sysop, whatever — leaving stops being a
+     * one-click self-service action, since it would also mean giving
+     * up a role they didn't grant themselves.
+     */
+    public function canLeave(User $user, Module $module): bool
+    {
+        $defaultRole = $module->defaultRole();
+
+        if (! $defaultRole) {
+            return false;
+        }
+
+        $activeRoleIds = UserModuleRole::where('user_id', $user->id)
+            ->where('module_id', $module->id)
+            ->where('is_active', true)
+            ->pluck('role_id');
+
+        return $activeRoleIds->isNotEmpty()
+            && $activeRoleIds->every(fn ($roleId) => $roleId === $defaultRole->id);
     }
 
     /**

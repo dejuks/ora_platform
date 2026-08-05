@@ -25,7 +25,11 @@
       <div>
         <h1 class="h3 mb-1"><?php echo e($manuscript->title); ?></h1>
         <p class="text-muted mb-0">
-          By <?php echo e($manuscript->author->full_name); ?> ·
+          <?php if($blindAuthor): ?>
+            <span class="badge bg-light text-dark border"><i class="bi bi-eye-slash"></i> Author Blinded for Peer Review</span> ·
+          <?php else: ?>
+            By <?php echo e($manuscript->byline()); ?> ·
+          <?php endif; ?>
           <span class="badge bg-secondary"><?php echo e($manuscript->statusLabel()); ?></span>
         </p>
       </div>
@@ -334,8 +338,18 @@
             <div class="card-header"><strong>Publish</strong></div>
             <div class="card-body">
               <?php if($manuscript->isFeeSettled() && $manuscript->isProofApproved()): ?>
-                <form action="<?php echo e(route('journal.manuscripts.publish', $manuscript)); ?>" method="POST">
+                <form action="<?php echo e(route('journal.manuscripts.publish', $manuscript)); ?>" method="POST" enctype="multipart/form-data">
                   <?php echo csrf_field(); ?>
+                  <div class="mb-3">
+                    <label class="form-label">DOI-Stamped Version-of-Record (optional)</label>
+                    <input type="file" name="published_file" class="form-control" accept=".pdf,.doc,.docx">
+                    <div class="form-text">
+                      Leave blank to publish the exact proof the author already approved.
+                      Only attach a different file here if it's the same approved content
+                      with the DOI/citation footer added — not a way to slip in changes
+                      the author hasn't seen.
+                    </div>
+                  </div>
                   <button type="submit" class="btn btn-success">
                     <i class="bi bi-globe"></i> Publish & Assign DOI
                   </button>
@@ -373,6 +387,37 @@
       </div>
 
       <div class="col-lg-4">
+        <?php if (! ($blindAuthor)): ?>
+          <div class="card mb-4">
+            <div class="card-header"><strong>Authors</strong></div>
+            <div class="card-body">
+              <div class="mb-3 pb-3 border-bottom">
+                <div class="fw-semibold"><?php echo e($manuscript->author->full_name); ?></div>
+                <div class="text-muted small">Corresponding Author</div>
+                <?php if($manuscript->author->email): ?>
+                  <div class="text-muted small"><?php echo e($manuscript->author->email); ?></div>
+                <?php endif; ?>
+              </div>
+              <?php $__empty_1 = true; $__currentLoopData = $manuscript->coAuthors; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $coAuthor): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
+                <div class="mb-3 pb-3 <?php echo e(! $loop->last ? 'border-bottom' : ''); ?>">
+                  <div class="fw-semibold"><?php echo e($coAuthor->full_name); ?></div>
+                  <?php if($coAuthor->affiliation): ?>
+                    <div class="text-muted small"><?php echo e($coAuthor->affiliation); ?></div>
+                  <?php endif; ?>
+                  <?php if($coAuthor->email): ?>
+                    <div class="text-muted small"><?php echo e($coAuthor->email); ?></div>
+                  <?php endif; ?>
+                  <?php if($coAuthor->orcid): ?>
+                    <div class="text-muted small"><i class="bi bi-person-badge"></i> <?php echo e($coAuthor->orcid); ?></div>
+                  <?php endif; ?>
+                </div>
+              <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
+                <p class="text-muted small mb-0">No co-authors listed.</p>
+              <?php endif; ?>
+            </div>
+          </div>
+        <?php endif; ?>
+
         <div class="card">
           <div class="card-header"><strong>Reviews</strong></div>
           <div class="card-body">

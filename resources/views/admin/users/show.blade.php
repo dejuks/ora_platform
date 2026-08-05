@@ -5,7 +5,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
       <div>
         <h1 class="h3 mb-1">{{ $user->full_name }}</h1>
-        <p class="text-muted mb-0">{{ $user->email }} · @{{ $user->username }}</p>
+        <p class="text-muted mb-0">{{ $user->email }} · {{ '@'.$user->username }}</p>
       </div>
       <a href="{{ route('admin.users.edit', $user) }}" class="btn btn-primary">
         <i class="bi bi-pencil"></i> Edit

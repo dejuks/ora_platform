@@ -43,7 +43,7 @@
                         <img src="<?php echo e($avatar); ?>" alt="<?php echo e($user->full_name); ?>"
                              class="rounded-circle mb-3" style="width:120px;height:120px;object-fit:cover;">
                         <h5 class="mb-0"><?php echo e($user->full_name); ?></h5>
-                        <p class="text-muted small mb-3">{{ $user->username }}</p>
+                        <p class="text-muted small mb-3"><?php echo e('@'.$user->username); ?></p>
 
                         <form method="POST" action="<?php echo e(route('account.profile.photo')); ?>" enctype="multipart/form-data">
                             <?php echo csrf_field(); ?>

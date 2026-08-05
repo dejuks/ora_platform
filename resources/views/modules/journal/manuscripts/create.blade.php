@@ -58,7 +58,21 @@
           </div>
 
         </div>
+
+        <div class="alert alert-info d-flex gap-2 mt-3">
+          <i class="bi bi-eye-slash mt-1"></i>
+          <div>
+            <strong>This journal uses double-blind peer review.</strong>
+            Reviewers never see your name — but they do read this file, so please remove
+            your name, affiliation, and any acknowledgements that would identify you from
+            the document itself before uploading. Your name and affiliation are captured
+            separately from your account and reappear automatically on the published
+            article; they don't need to be in this file.
+          </div>
+        </div>
       </div>
+
+      @include('modules.journal.manuscripts._co-authors')
 
       <div class="d-flex gap-2">
         <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">

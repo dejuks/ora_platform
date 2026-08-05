@@ -28,10 +28,23 @@
                 <i class="bi {{ $module->icon }}"></i>
                 <span class="fw-semibold">{{ $module->name }}</span>
               </div>
-              <span class="badge bg-success-subtle text-success-emphasis">Active</span>
-              @if($module->route)
-                <a href="{{ route($module->route) }}" class="btn btn-sm btn-outline-primary float-end">Open</a>
-              @endif
+              <span class="badge bg-success-subtle text-success-emphasis mb-2">Active</span>
+              <div class="d-flex gap-2 mt-2">
+                @if($module->route)
+                  <a href="{{ route($module->route) }}" class="btn btn-sm btn-outline-primary">Open</a>
+                @endif
+                @if($module->can_leave)
+                  <form method="POST" action="{{ route('my-modules.leave', $module->code) }}"
+                        class="ms-auto"
+                        onsubmit="return confirm('Leave {{ $module->name }}? You can rejoin any time from this page.');">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-box-arrow-left"></i> Leave
+                    </button>
+                  </form>
+                @endif
+              </div>
             </div>
           </div>
         </div>

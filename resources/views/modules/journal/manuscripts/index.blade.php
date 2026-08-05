@@ -34,7 +34,13 @@
               @forelse($manuscripts as $manuscript)
                 <tr>
                   <td>{{ $manuscript->title }}</td>
-                  <td>{{ $manuscript->author->full_name }}</td>
+                  <td>
+                    @if($blindAuthor)
+                      <span class="text-muted"><i class="bi bi-eye-slash"></i> Blinded</span>
+                    @else
+                      {{ $manuscript->author->full_name }}
+                    @endif
+                  </td>
                   <td>{{ $manuscript->associateEditor->full_name ?? '—' }}</td>
                   <td>
                     <span class="badge bg-secondary">{{ $manuscript->statusLabel() }}</span>

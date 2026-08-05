@@ -37,10 +37,23 @@
                 <i class="bi <?php echo e($module->icon); ?>"></i>
                 <span class="fw-semibold"><?php echo e($module->name); ?></span>
               </div>
-              <span class="badge bg-success-subtle text-success-emphasis">Active</span>
-              <?php if($module->route): ?>
-                <a href="<?php echo e(route($module->route)); ?>" class="btn btn-sm btn-outline-primary float-end">Open</a>
-              <?php endif; ?>
+              <span class="badge bg-success-subtle text-success-emphasis mb-2">Active</span>
+              <div class="d-flex gap-2 mt-2">
+                <?php if($module->route): ?>
+                  <a href="<?php echo e(route($module->route)); ?>" class="btn btn-sm btn-outline-primary">Open</a>
+                <?php endif; ?>
+                <?php if($module->can_leave): ?>
+                  <form method="POST" action="<?php echo e(route('my-modules.leave', $module->code)); ?>"
+                        class="ms-auto"
+                        onsubmit="return confirm('Leave <?php echo e($module->name); ?>? You can rejoin any time from this page.');">
+                    <?php echo csrf_field(); ?>
+                    <?php echo method_field('DELETE'); ?>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                      <i class="bi bi-box-arrow-left"></i> Leave
+                    </button>
+                  </form>
+                <?php endif; ?>
+              </div>
             </div>
           </div>
         </div>

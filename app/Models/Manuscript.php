@@ -31,6 +31,7 @@ class Manuscript extends Model
         'proof_sent_by',
         'proof_sent_at',
         'proof_responded_at',
+        'published_file',
         'submitted_at',
         'decided_at',
         'published_at',
@@ -90,6 +91,11 @@ class Manuscript extends Model
     public function reviews()
     {
         return $this->hasMany(ManuscriptReview::class);
+    }
+
+    public function coAuthors()
+    {
+        return $this->hasMany(ManuscriptCoAuthor::class)->orderBy('position');
     }
 
     public function payments()
@@ -258,6 +264,36 @@ class Manuscript extends Model
     public function isProofAwaitingAuthor(): bool
     {
         return $this->proof_status === 'sent';
+    }
+
+    /**
+     * The one file the public site should ever link to: the
+     * version-of-record. Never manuscript_file (the blind
+     * peer-review copy) — that file is never guaranteed to carry
+     * author details, page numbers, or the DOI footer.
+     *
+     * Falls back to proof_file for manuscripts published before a
+     * separately DOI-stamped file was attached, since the proof is,
+     * by definition, the exact content the author already approved.
+     */
+    public function publicFile(): ?string
+    {
+        return $this->published_file ?: $this->proof_file;
+    }
+
+    /**
+     * Full byline in author order: the corresponding author first,
+     * then every co-author in the order they were entered. Used
+     * anywhere the manuscript's authorship needs to be printed as a
+     * single line (public article page, citation block, etc).
+     */
+    public function byline(): string
+    {
+        $names = collect([$this->author?->full_name])
+            ->merge($this->coAuthors->pluck('full_name'))
+            ->filter();
+
+        return $names->implode(', ');
     }
 
     /*
