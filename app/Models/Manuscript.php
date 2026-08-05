@@ -24,6 +24,13 @@ class Manuscript extends Model
         'publication_fee',
         'payment_status',
         'fee_paid_at',
+        'proof_file',
+        'proof_status',
+        'proof_message',
+        'proof_feedback',
+        'proof_sent_by',
+        'proof_sent_at',
+        'proof_responded_at',
         'submitted_at',
         'decided_at',
         'published_at',
@@ -38,6 +45,8 @@ class Manuscript extends Model
             'decided_at' => 'datetime',
             'published_at' => 'datetime',
             'fee_paid_at' => 'datetime',
+            'proof_sent_at' => 'datetime',
+            'proof_responded_at' => 'datetime',
             'publication_fee' => 'decimal:2',
         ];
     }
@@ -209,6 +218,46 @@ class Manuscript extends Model
     public function isFeeSettled(): bool
     {
         return $this->publication_fee <= 0 || in_array($this->payment_status, ['paid', 'waived']);
+    }
+
+    /**
+     * Every state the publication proof can be in.
+     */
+    public const PROOF_STATUSES = [
+        'not_sent' => 'Not Sent',
+        'sent' => 'Awaiting Author Review',
+        'approved' => 'Approved by Author',
+        'changes_requested' => 'Changes Requested',
+    ];
+
+    public function proofSentBy()
+    {
+        return $this->belongsTo(User::class, 'proof_sent_by');
+    }
+
+    public function proofStatusLabel(): string
+    {
+        return self::PROOF_STATUSES[$this->proof_status] ?? $this->proof_status;
+    }
+
+    /**
+     * The single gate publish() checks in addition to the fee: the
+     * author must have read the final publication proof and approved
+     * it (as opposed to it never being sent, still sitting with the
+     * author, or having been kicked back with change requests).
+     */
+    public function isProofApproved(): bool
+    {
+        return $this->proof_status === 'approved';
+    }
+
+    /**
+     * The proof is currently sitting with the author, waiting on
+     * their approval or comments.
+     */
+    public function isProofAwaitingAuthor(): bool
+    {
+        return $this->proof_status === 'sent';
     }
 
     /*

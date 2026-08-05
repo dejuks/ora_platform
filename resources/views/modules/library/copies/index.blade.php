@@ -38,6 +38,17 @@
       </div>
     </div>
 
+    @if($branches->count() > 1)
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <a href="{{ route('library.copies.index', array_filter(['status' => request('status'), 'q' => request('q')])) }}"
+           class="btn btn-sm btn-outline-primary {{ !request('branch') ? 'active' : '' }}">All Branches</a>
+        @foreach($branches as $branch)
+          <a href="{{ route('library.copies.index', array_filter(['status' => request('status'), 'q' => request('q'), 'branch' => $branch->id])) }}"
+             class="btn btn-sm btn-outline-primary {{ (string) request('branch') === (string) $branch->id ? 'active' : '' }}">{{ $branch->locationLabel() }}</a>
+        @endforeach
+      </div>
+    @endif
+
     <div class="card">
       <div class="card-body">
         <div class="table-responsive">
@@ -46,6 +57,7 @@
               <tr>
                 <th>Title</th>
                 <th>Barcode</th>
+                <th>Branch</th>
                 <th>Shelf</th>
                 <th>Condition</th>
                 <th>Status</th>
@@ -57,6 +69,7 @@
                 <tr>
                   <td><a href="{{ route('library.books.show', $copy->book) }}">{{ $copy->book->title }}</a></td>
                   <td>{{ $copy->barcode }}</td>
+                  <td>{{ $copy->branchLabel() }}</td>
                   <td>{{ $copy->shelf_location ?? '—' }}</td>
                   <td>{{ \App\Models\LibraryBookCopy::CONDITIONS[$copy->condition] ?? $copy->condition }}</td>
                   <td>
@@ -68,6 +81,11 @@
                     <form action="{{ route('library.copies.status', $copy) }}" method="POST" class="d-inline-flex gap-1">
                       @csrf
                       @method('PATCH')
+                      <select name="branch_id" class="form-select form-select-sm" style="width: auto;" title="Transfer branch">
+                        @foreach($branches as $branch)
+                          <option value="{{ $branch->id }}" {{ $copy->branch_id === $branch->id ? 'selected' : '' }}>{{ $branch->locationLabel() }}</option>
+                        @endforeach
+                      </select>
                       <select name="status" class="form-select form-select-sm" style="width: auto;">
                         @foreach(['available' => 'Available', 'lost' => 'Lost', 'damaged' => 'Damaged', 'withdrawn' => 'Withdrawn'] as $value => $label)
                           <option value="{{ $value }}" {{ $copy->status === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -79,7 +97,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No copies tagged yet.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No copies tagged yet.</td>
                 </tr>
               @endforelse
             </tbody>

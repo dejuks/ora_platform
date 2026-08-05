@@ -54,6 +54,17 @@
       <a href="<?php echo e(route('library.circulation.index', ['status' => 'returned'])); ?>" class="btn btn-sm btn-outline-secondary <?php echo e(request('status') == 'returned' ? 'active' : ''); ?>">Returned</a>
     </div>
 
+    <?php if($canManageCirculation && $branches->count() > 1): ?>
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <a href="<?php echo e(route('library.circulation.index', array_filter(['status' => request('status')]))); ?>"
+           class="btn btn-sm btn-outline-primary <?php echo e(!request('branch') ? 'active' : ''); ?>">All Branches</a>
+        <?php $__currentLoopData = $branches; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $branch): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+          <a href="<?php echo e(route('library.circulation.index', array_filter(['status' => request('status'), 'branch' => $branch->id]))); ?>"
+             class="btn btn-sm btn-outline-primary <?php echo e((string) request('branch') === (string) $branch->id ? 'active' : ''); ?>"><?php echo e($branch->locationLabel()); ?></a>
+        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+      </div>
+    <?php endif; ?>
+
     <div class="card">
       <div class="card-body">
         <div class="table-responsive">
@@ -62,6 +73,7 @@
               <tr>
                 <th>Title</th>
                 <th>Barcode</th>
+                <th>Branch</th>
                 <th>Member</th>
                 <th>Due</th>
                 <th>Status</th>
@@ -73,6 +85,7 @@
                 <tr>
                   <td><?php echo e($loan->copy->book->title ?? '—'); ?></td>
                   <td><?php echo e($loan->copy->barcode ?? '—'); ?></td>
+                  <td><?php echo e($loan->copy?->branchLabel() ?? '—'); ?></td>
                   <td><?php echo e($loan->member->user->full_name ?? '—'); ?> (<?php echo e($loan->member->membership_no); ?>)</td>
                   <td><?php echo e($loan->due_at->format('M d, Y')); ?></td>
                   <td>
@@ -98,7 +111,7 @@
                 </tr>
               <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No loans found.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No loans found.</td>
                 </tr>
               <?php endif; ?>
             </tbody>

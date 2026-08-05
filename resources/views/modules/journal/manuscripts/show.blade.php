@@ -234,24 +234,112 @@
           </div>
         @endif
 
+        {{-- AUTHOR: Review & Approve the Publication Proof --}}
+        @if($manuscript->author_id === $user->id && $manuscript->isProofAwaitingAuthor())
+          <div class="card mb-4 border-warning">
+            <div class="card-header bg-warning-subtle"><strong>Action Needed: Review Your Publication Proof</strong></div>
+            <div class="card-body">
+              <p class="mb-3">
+                The Journal Manager has sent the final publication document for your review.
+                Please read it in full before approving — this is exactly what will be published
+                and assigned a DOI.
+              </p>
+              @if($manuscript->proof_message)
+                <p class="text-muted"><strong>Note from the Journal Manager:</strong> {{ $manuscript->proof_message }}</p>
+              @endif
+              @if($manuscript->proof_file)
+                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->proof_file) }}" target="_blank" class="btn btn-outline-primary mb-3">
+                  <i class="bi bi-file-earmark-pdf"></i> View Full Publication Document
+                </a>
+              @endif
+              <form action="{{ route('journal.manuscripts.proof.respond', $manuscript) }}" method="POST">
+                @csrf
+                <div class="mb-3">
+                  <label class="form-label">Comments (required if requesting changes)</label>
+                  <textarea name="feedback" class="form-control" rows="3"
+                            placeholder="Anything that needs fixing before this can go live"></textarea>
+                </div>
+                <button type="submit" name="decision" value="approved" class="btn btn-success">
+                  <i class="bi bi-check-circle"></i> Approve for Publication
+                </button>
+                <button type="submit" name="decision" value="changes_requested" class="btn btn-outline-warning">
+                  <i class="bi bi-chat-left-text"></i> Request Changes
+                </button>
+              </form>
+            </div>
+          </div>
+        @endif
+
+        @if($manuscript->author_id === $user->id && $manuscript->proof_status === 'changes_requested')
+          <div class="alert alert-info">
+            <i class="bi bi-hourglass-split"></i>
+            You requested changes to the publication proof. The Journal Manager will revise
+            it and send you an updated version to review.
+          </div>
+        @endif
+
+        {{-- JOURNAL MANAGER / EIC: Send the Publication Proof --}}
+        @if($canPublish && $manuscript->status === 'accepted' && $manuscript->isFeeSettled() && ! $manuscript->isProofApproved())
+          <div class="card mb-4">
+            <div class="card-header"><strong>Publication Proof</strong></div>
+            <div class="card-body">
+              @if($manuscript->proof_status !== 'not_sent')
+                <p class="mb-3">
+                  Status: <span class="badge bg-secondary">{{ $manuscript->proofStatusLabel() }}</span>
+                  @if($manuscript->proof_sent_at)
+                    · sent {{ $manuscript->proof_sent_at->format('M d, Y') }}
+                  @endif
+                </p>
+                @if($manuscript->proof_status === 'changes_requested' && $manuscript->proof_feedback)
+                  <div class="alert alert-warning">
+                    <strong>Author's comments:</strong> {{ $manuscript->proof_feedback }}
+                  </div>
+                @endif
+              @endif
+              <form action="{{ route('journal.manuscripts.proof.send', $manuscript) }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                <div class="mb-3">
+                  <label class="form-label">Full Publication Document *</label>
+                  <input type="file" name="proof_file" class="form-control" accept=".pdf,.doc,.docx" required>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Note to Author</label>
+                  <textarea name="proof_message" class="form-control" rows="2"
+                            placeholder="Anything the author should know before reviewing"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                  <i class="bi bi-send"></i>
+                  {{ $manuscript->proof_status === 'not_sent' ? 'Send Proof to Author' : 'Send Revised Proof to Author' }}
+                </button>
+              </form>
+            </div>
+          </div>
+        @endif
+
         {{-- JOURNAL MANAGER / EIC: Publish --}}
         @if($canPublish && $manuscript->status === 'accepted')
           <div class="card mb-4">
             <div class="card-header"><strong>Publish</strong></div>
             <div class="card-body">
-              @if($manuscript->isFeeSettled())
+              @if($manuscript->isFeeSettled() && $manuscript->isProofApproved())
                 <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST">
                   @csrf
                   <button type="submit" class="btn btn-success">
                     <i class="bi bi-globe"></i> Publish & Assign DOI
                   </button>
                 </form>
-              @else
+              @elseif(! $manuscript->isFeeSettled())
                 <p class="text-muted mb-0">
                   <i class="bi bi-hourglass-split"></i>
                   Waiting on the author's publication fee
                   ({{ \App\Models\JournalSetting::current()->currency }} {{ number_format($manuscript->publication_fee, 2) }})
                   before this can be published.
+                </p>
+              @else
+                <p class="text-muted mb-0">
+                  <i class="bi bi-hourglass-split"></i>
+                  Waiting on the author to approve the publication proof
+                  ({{ $manuscript->proofStatusLabel() }}) before this can be published.
                 </p>
               @endif
             </div>

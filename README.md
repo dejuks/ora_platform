@@ -1,102 +1,112 @@
-# ORA Platform — Digital Library Payment Integration
+# ORA Platform — Physical Library Branches (Locations)
 
-Full CRUD pricing plans + Chapa checkout for paid digital resources
-(ebooks, journal articles, papers, other), for the ORA Platform
-Digital Library module.
+Adds multi-branch support to the Physical Library — Jimma, Adama,
+Finfinnee, Shashamane, Bale Robe, Nekemte, and any others the Library
+Manager adds — with role-scoped staff access to each.
 
 ## What this adds
 
-- **`library_pricing_plans`** — a full CRUD list of fee rules (name,
-  optional resource-type scope, amount, currency, active/inactive)
-  managed by the Library Manager (`manage-settings`), under
-  **Library → Pricing Plans** in the sidebar.
-- **`library_digital_resources.pricing_plan_id`** — a Digital
-  Librarian assigns one of these plans (or none = free) when
-  uploading/editing a resource.
-- **`library_resource_purchases`** — one row per Chapa checkout
-  attempt; snapshots the amount/currency actually charged so a later
-  change to the plan (or its deletion) never rewrites history.
-- A public checkout flow: a paid resource shows a "Buy Access" button
-  instead of "Download" until the logged-in user has a completed
-  purchase. Buying auto-enrolls the user into the Library module if
-  they aren't already (same pattern as the existing hold/reserve
-  flow) — no separate sign-up needed first.
-- Staff with `manage-digital-collection`, and a resource's own owner
-  (`submit-digital-content`), always bypass payment for their own
-  reviewing/uploading, exactly like the rest of the module already
-  works for access tiers.
+- **`library_branches`** — full CRUD (name, code, city, region,
+  address, phone, email, active flag) under **Library → Branches**,
+  gated by `manage-settings` (Library Manager).
+- **`library_book_copies.branch_id`** — every physical copy now
+  belongs to one branch. Nullable at the DB level (existing copies
+  keep working, shown as "Unassigned" until an Inventory Manager
+  assigns one); required for any *new* copy going forward.
+- **`library_branch_staff`** — lets the Library Manager scope a
+  Cataloger / Inventory Manager / Librarian (Physical) / Acquisition
+  Officer to one or more specific branches from the branch's Edit
+  page. **A staff member with no assignments at all keeps access to
+  every branch** — nobody currently working is locked out by this
+  shipping.
+- `User::canAccessLibraryBranch()` / `accessibleLibraryBranchIds()` —
+  Library Manager and Super Admin always bypass branch scoping
+  entirely; this is the single source of truth every controller below
+  checks against.
+
+## Where branch-awareness shows up
+
+- **Cataloging** (`BookController`): adding a physical copy now
+  requires picking a branch (only branches you're allowed to use are
+  listed); the copies table on a book's page shows each copy's branch.
+- **Inventory / stocktaking** (`copiesIndex`): filterable by branch,
+  and a branch-scoped Inventory Manager only ever sees their own
+  branch's copies. The status-update form doubles as a branch
+  transfer — both the source and destination branch are permission-
+  checked.
+- **Circulation** (`CirculationController`): checkout, check-in, and
+  staff-side renewal are all blocked if you're not scoped to that
+  copy's branch. The Circulation Desk list is filterable by branch too.
+- **Public catalog** (`PublicController` + `public/index.blade.php` /
+  `public/show.blade.php`): visitors can filter the catalog by branch,
+  see "N available at this branch," and a book's detail page shows a
+  full per-branch availability breakdown.
 
 ## How to apply
 
 1. Copy every file in this archive into your `ora_platform` working
-   copy, preserving paths (they overlay directly onto
-   `app/`, `database/`, `resources/`, `routes/`, `bootstrap/`).
-   Two files (`app/Models/LibraryDigitalResource.php`,
-   `app/Http/Controllers/Library/DigitalResourceController.php`,
-   `app/Http/Controllers/Library/PublicController.php`,
+   copy, preserving paths. As with the last package, several files
+   (`app/Http/Controllers/Library/BookController.php`,
+   `CirculationController.php`, `PublicController.php`,
+   `app/Models/LibraryBookCopy.php`, `app/Models/User.php`,
    `app/Services/SidebarService.php`, `routes/web.php`,
-   `bootstrap/app.php`, `database/seeders/RoleSeeder.php`) are edited
-   copies of files that already exist in your repo — they fully
-   replace the originals, they aren't diffs to merge by hand.
+   `database/seeders/DatabaseSeeder.php`) are edited copies that fully
+   replace what's already in your repo.
 
 2. Run the new migrations:
    ```
    php artisan migrate
    ```
 
-3. Re-run the role seeder so Library Manager picks up the new
-   `manage-payments` permission (used to notify staff when a purchase
-   completes):
+3. Seed the initial six branches (safe to re-run — it's
+   `firstOrCreate` by branch code):
    ```
-   php artisan db:seed --class=RoleSeeder
-   ```
-   This seeder uses `updateOrCreate`/`sync`, so it's safe to re-run —
-   it won't duplicate or reset anything else.
-
-4. Make sure your `.env` already has (it should, if Ebook/Journal
-   payments work today):
-   ```
-   CHAPA_SECRET_KEY=...
-   CHAPA_PUBLIC_KEY=...
+   php artisan db:seed --class=LibraryBranchSeeder
    ```
 
-5. Create a pricing plan: **Library → Pricing Plans → New Pricing
-   Plan**. Then, on any digital resource's create/edit form, pick it
-   under the new **Pricing** card.
+4. From **Library → Branches**, open a branch's Edit page to assign
+   specific staff to it, if you want anyone restricted. Leave everyone
+   unassigned if you'd rather keep today's "anyone with the role can
+   act anywhere" behavior for now and lock it down later branch by
+   branch.
 
-6. For the Chapa webhook to actually confirm payments
-   (`library/digital-resources/payments/chapa/webhook`), your server
-   needs to be reachable from the internet — same requirement as your
-   existing Ebook/Journal webhooks, so if those work in production
-   already, this will too. Locally, the "return" redirect after
-   checkout will also attempt to verify+settle the payment as a
-   convenience, but the webhook is the real source of truth.
+5. Existing physical copies will show as "Unassigned" until an
+   Inventory Manager opens **Stocktake / Copies** and transfers each
+   one to its real branch (the status-update dropdown includes a
+   branch selector for exactly this).
 
 ## Files in this archive
 
 ```
-app/Http/Controllers/Library/DigitalResourceController.php   (edited)
-app/Http/Controllers/Library/DigitalResourcePaymentController.php (new)
-app/Http/Controllers/Library/PricingPlanController.php        (new)
-app/Http/Controllers/Library/PublicController.php              (edited)
-app/Models/LibraryDigitalResource.php                          (edited)
-app/Models/LibraryPricingPlan.php                              (new)
-app/Models/LibraryResourcePurchase.php                         (new)
-app/Services/SidebarService.php                                (edited)
-bootstrap/app.php                                               (edited)
-database/migrations/2027_07_28_000100_create_library_pricing_plans_table.php
-database/migrations/2027_07_28_000200_add_pricing_plan_id_to_library_digital_resources_table.php
-database/migrations/2027_07_28_000300_create_library_resource_purchases_table.php
-database/seeders/RoleSeeder.php                                (edited)
-resources/views/modules/library/digital-resources/create.blade.php (edited)
-resources/views/modules/library/digital-resources/edit.blade.php   (edited)
-resources/views/modules/library/digital-resources/index.blade.php  (edited)
-resources/views/modules/library/digital-resources/payment.blade.php (new)
-resources/views/modules/library/digital-resources/show.blade.php    (edited)
-resources/views/modules/library/pricing-plans/create.blade.php (new)
-resources/views/modules/library/pricing-plans/edit.blade.php   (new)
-resources/views/modules/library/pricing-plans/index.blade.php  (new)
-resources/views/modules/library/public/digital-index.blade.php (edited)
-resources/views/modules/library/public/digital-show.blade.php  (edited)
-routes/web.php                                                  (edited)
+app/Http/Controllers/Library/BookController.php        (edited)
+app/Http/Controllers/Library/BranchController.php       (new)
+app/Http/Controllers/Library/CirculationController.php  (edited)
+app/Http/Controllers/Library/PublicController.php       (edited)
+app/Models/LibraryBookCopy.php                           (edited)
+app/Models/LibraryBranch.php                             (new)
+app/Models/User.php                                      (edited)
+app/Services/SidebarService.php                          (edited)
+database/migrations/2027_08_04_000100_create_library_branches_table.php
+database/migrations/2027_08_04_000200_add_branch_id_to_library_book_copies_table.php
+database/migrations/2027_08_04_000300_create_library_branch_staff_table.php
+database/seeders/DatabaseSeeder.php                      (edited)
+database/seeders/LibraryBranchSeeder.php                 (new)
+resources/views/modules/library/books/show.blade.php     (edited)
+resources/views/modules/library/branches/create.blade.php (new)
+resources/views/modules/library/branches/edit.blade.php   (new)
+resources/views/modules/library/branches/index.blade.php  (new)
+resources/views/modules/library/circulation/index.blade.php (edited)
+resources/views/modules/library/copies/index.blade.php    (edited)
+resources/views/modules/library/public/index.blade.php    (edited)
+resources/views/modules/library/public/show.blade.php     (edited)
+routes/web.php                                            (edited)
 ```
+
+## Note on this session
+
+I wasn't able to run `php artisan` or boot Laravel in this sandbox (no
+PHP binary available), so this was verified by careful reading and a
+brace-balance check across every file, not by actually executing it.
+Please run `php artisan migrate` and click through cataloging → tagging
+a copy → checkout/check-in → the public catalog once locally before
+this goes to production.

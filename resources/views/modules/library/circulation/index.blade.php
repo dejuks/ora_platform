@@ -45,6 +45,17 @@
       <a href="{{ route('library.circulation.index', ['status' => 'returned']) }}" class="btn btn-sm btn-outline-secondary {{ request('status') == 'returned' ? 'active' : '' }}">Returned</a>
     </div>
 
+    @if($canManageCirculation && $branches->count() > 1)
+      <div class="d-flex gap-2 flex-wrap mb-3">
+        <a href="{{ route('library.circulation.index', array_filter(['status' => request('status')])) }}"
+           class="btn btn-sm btn-outline-primary {{ !request('branch') ? 'active' : '' }}">All Branches</a>
+        @foreach($branches as $branch)
+          <a href="{{ route('library.circulation.index', array_filter(['status' => request('status'), 'branch' => $branch->id])) }}"
+             class="btn btn-sm btn-outline-primary {{ (string) request('branch') === (string) $branch->id ? 'active' : '' }}">{{ $branch->locationLabel() }}</a>
+        @endforeach
+      </div>
+    @endif
+
     <div class="card">
       <div class="card-body">
         <div class="table-responsive">
@@ -53,6 +64,7 @@
               <tr>
                 <th>Title</th>
                 <th>Barcode</th>
+                <th>Branch</th>
                 <th>Member</th>
                 <th>Due</th>
                 <th>Status</th>
@@ -64,6 +76,7 @@
                 <tr>
                   <td>{{ $loan->copy->book->title ?? '—' }}</td>
                   <td>{{ $loan->copy->barcode ?? '—' }}</td>
+                  <td>{{ $loan->copy?->branchLabel() ?? '—' }}</td>
                   <td>{{ $loan->member->user->full_name ?? '—' }} ({{ $loan->member->membership_no }})</td>
                   <td>{{ $loan->due_at->format('M d, Y') }}</td>
                   <td>
@@ -88,7 +101,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No loans found.</td>
+                  <td colspan="7" class="text-center text-muted py-4">No loans found.</td>
                 </tr>
               @endforelse
             </tbody>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBook;
+use App\Models\LibraryBranch;
 use App\Models\LibraryCategory;
 use App\Models\LibraryDigitalResource;
 use App\Models\LibraryHold;
@@ -54,6 +55,14 @@ class PublicController extends Controller
             $query->inCategory($request->string('category'));
         }
 
+        if ($request->filled('branch')) {
+            $branchId = $request->get('branch');
+            $query->whereHas('copies', fn ($q) => $q->where('branch_id', $branchId));
+            $query->withCount([
+                'copies as available_at_branch_count' => fn ($q) => $q->where('branch_id', $branchId)->where('status', 'available'),
+            ]);
+        }
+
         if ($request->filled('letter') && $request->get('letter') !== 'ALL') {
             $query->titleStartsWith(strtoupper($request->string('letter')));
         }
@@ -74,7 +83,9 @@ class PublicController extends Controller
 
         $letters = range('A', 'Z');
 
-        return view('modules.library.public.index', compact('books', 'categories', 'letters'));
+        $branches = LibraryBranch::active()->orderBy('name')->get();
+
+        return view('modules.library.public.index', compact('books', 'categories', 'letters', 'branches'));
     }
 
     public function show(LibraryBook $book)
@@ -88,13 +99,19 @@ class PublicController extends Controller
 
         $book->load('category');
 
+        $copiesByBranch = $book->copies()
+            ->selectRaw('branch_id, count(*) as total, sum(case when status = \'available\' then 1 else 0 end) as available')
+            ->groupBy('branch_id')
+            ->with('branch')
+            ->get();
+
         $member = Auth::user()?->libraryMember;
 
         $myHold = $member
             ? $book->holds()->where('library_member_id', $member->id)->whereIn('status', ['pending', 'ready'])->first()
             : null;
 
-        return view('modules.library.public.show', compact('book', 'myHold'));
+        return view('modules.library.public.show', compact('book', 'myHold', 'copiesByBranch'));
     }
 
     /**

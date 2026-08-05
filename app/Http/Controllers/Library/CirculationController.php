@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Library;
 
 use App\Http\Controllers\Controller;
 use App\Models\LibraryBookCopy;
+use App\Models\LibraryBranch;
 use App\Models\LibraryCirculationPolicy;
 use App\Models\LibraryFine;
 use App\Models\LibraryLoan;
@@ -41,7 +42,17 @@ class CirculationController extends Controller
             return redirect()->route('library.members.show', $member);
         }
 
-        $query = LibraryLoan::with(['copy.book', 'member.user'])->latest('checked_out_at');
+        $query = LibraryLoan::with(['copy.book', 'copy.branch', 'member.user'])->latest('checked_out_at');
+
+        $accessibleBranchIds = $user->accessibleLibraryBranchIds();
+
+        if ($accessibleBranchIds !== null) {
+            $query->whereHas('copy', fn ($q) => $q->whereIn('branch_id', $accessibleBranchIds));
+        }
+
+        if ($request->filled('branch')) {
+            $query->whereHas('copy', fn ($q) => $q->where('branch_id', $request->get('branch')));
+        }
 
         if ($request->get('status') === 'overdue') {
             $query->overdue();
@@ -51,7 +62,11 @@ class CirculationController extends Controller
 
         $loans = $query->paginate(20)->withQueryString();
 
-        return view('modules.library.circulation.index', compact('loans'));
+        $branches = $accessibleBranchIds === null
+            ? LibraryBranch::active()->orderBy('name')->get()
+            : LibraryBranch::whereIn('id', $accessibleBranchIds)->orderBy('name')->get();
+
+        return view('modules.library.circulation.index', compact('loans', 'branches'));
     }
 
     /**
@@ -69,6 +84,8 @@ class CirculationController extends Controller
 
         $copy = LibraryBookCopy::where('barcode', $data['barcode'])->firstOrFail();
         $member = LibraryMember::where('membership_no', $data['membership_no'])->firstOrFail();
+
+        abort_unless(Auth::user()->canAccessLibraryBranch($copy->branch_id), 403, 'You are not assigned to this copy\'s branch.');
 
         // A copy reserved (on_hold) for this exact member's ready hold
         // can also be checked out — anyone else's reservation, or a
@@ -123,6 +140,8 @@ class CirculationController extends Controller
         $this->authorizePermission('manage-circulation');
 
         abort_unless($loan->status === 'active', 422, 'This loan has already been closed out.');
+
+        abort_unless(Auth::user()->canAccessLibraryBranch($loan->copy->branch_id), 403, 'You are not assigned to this copy\'s branch.');
 
         $daysLate = $loan->daysOverdue();
 
@@ -179,6 +198,10 @@ class CirculationController extends Controller
         $isOwner = $user->libraryMember?->id === $loan->library_member_id;
 
         abort_unless($isStaff || $isOwner, 403, 'You do not have permission to renew this loan.');
+
+        if ($isStaff && ! $isOwner) {
+            abort_unless(Auth::user()->canAccessLibraryBranch($loan->copy->branch_id), 403, 'You are not assigned to this copy\'s branch.');
+        }
 
         $policy = LibraryCirculationPolicy::current();
 

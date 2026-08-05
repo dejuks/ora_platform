@@ -95,6 +95,20 @@
                     <p>{{ $book->description }}</p>
                 @endif
 
+                @if($copiesByBranch->isNotEmpty())
+                    <h5 class="mt-4">Availability by Branch</h5>
+                    <ul class="list-unstyled mb-0">
+                        @foreach($copiesByBranch as $row)
+                            <li class="d-flex justify-content-between border-bottom py-1">
+                                <span>{{ $row->branch?->locationLabel() ?? 'Unassigned' }}</span>
+                                <span class="{{ $row->available > 0 ? 'text-success' : 'text-muted' }}">
+                                    {{ $row->available }} of {{ $row->total }} available
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+
                 @if($myHold)
                     <div class="alert alert-info mt-3">
                         <i class="bi bi-bookmark-check"></i>

@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             JournalCategorySeeder::class,
             ManuscriptSeeder::class,
             LibraryCategorySeeder::class,
+            LibraryBranchSeeder::class,
             LibraryBookSeeder::class,
             LibraryDigitalResourceSeeder::class,
         ]);
