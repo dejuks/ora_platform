@@ -22,7 +22,7 @@ class PublicController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Manuscript::published()->with(['author', 'category']);
+        $query = Manuscript::published()->with(['author', 'category', 'coAuthors']);
 
         if ($request->filled('q')) {
             $term = $request->string('q');
@@ -63,7 +63,7 @@ class PublicController extends Controller
     {
         abort_unless($manuscript->status === 'published', 404);
 
-        $manuscript->load(['author', 'category']);
+        $manuscript->load(['author', 'category', 'coAuthors']);
 
         return view('modules.journal.public.show', compact('manuscript'));
     }

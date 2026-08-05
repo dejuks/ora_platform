@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Journal;
 
 use App\Http\Controllers\Controller;
 use App\Models\Manuscript;
+use App\Models\ManuscriptCoAuthor;
 use App\Models\ManuscriptReview;
 use App\Models\JournalCategory;
 use App\Models\JournalSetting;
@@ -57,7 +58,12 @@ class ManuscriptController extends Controller
 
         $manuscripts = $query->paginate(15)->withQueryString();
 
-        return view('modules.journal.manuscripts.index', compact('manuscripts'));
+        // Double-blind peer review: a plain Reviewer never sees who
+        // wrote what they're reviewing. Editorial roles and the
+        // author themselves still see full identity everywhere.
+        $blindAuthor = $this->isReviewerOnly($user);
+
+        return view('modules.journal.manuscripts.index', compact('manuscripts', 'blindAuthor'));
     }
 
     public function create()
@@ -78,6 +84,16 @@ class ManuscriptController extends Controller
             // the review workflow requires one.
             'manuscript_file' => ['required_if:action,submit', 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240'],
             'action' => ['required', 'in:draft,submit'],
+            // Co-authors: unlimited, and every field but the name is
+            // genuinely optional (see ManuscriptCoAuthor migration).
+            // A row with no name typed in is silently dropped rather
+            // than rejected — that's just an empty row the author
+            // added and then didn't fill in.
+            'co_authors' => ['nullable', 'array'],
+            'co_authors.*.full_name' => ['nullable', 'string', 'max:150'],
+            'co_authors.*.email' => ['nullable', 'email', 'max:150'],
+            'co_authors.*.affiliation' => ['nullable', 'string', 'max:255'],
+            'co_authors.*.orcid' => ['nullable', 'string', 'max:50'],
         ]);
 
         // CKEditor runs client-side only — this endpoint still accepts
@@ -99,7 +115,12 @@ class ManuscriptController extends Controller
         $data['created_by'] = Auth::id();
         unset($data['action']);
 
+        $coAuthors = $data['co_authors'] ?? [];
+        unset($data['co_authors']);
+
         $manuscript = Manuscript::create($data);
+
+        $this->syncCoAuthors($manuscript, $coAuthors);
 
         if ($isSubmit) {
             $this->notifyPermissionHolders('journal', 'screen-submissions', new AppNotification(
@@ -124,7 +145,7 @@ class ManuscriptController extends Controller
     {
         $this->authorizeView($manuscript);
 
-        $manuscript->load(['author', 'associateEditor', 'decidedBy', 'reviews.reviewer']);
+        $manuscript->load(['author', 'associateEditor', 'decidedBy', 'reviews.reviewer', 'coAuthors']);
 
         $reviewers = $this->isEditorial(Auth::user())
             ? User::whereHas('moduleRoles', function ($q) {
@@ -133,7 +154,9 @@ class ManuscriptController extends Controller
             })->get()
             : collect();
 
-        return view('modules.journal.manuscripts.show', compact('manuscript', 'reviewers'));
+        $blindAuthor = $this->isReviewerOnly(Auth::user());
+
+        return view('modules.journal.manuscripts.show', compact('manuscript', 'reviewers', 'blindAuthor'));
     }
 
     /**
@@ -174,9 +197,17 @@ class ManuscriptController extends Controller
                 'nullable', 'file', 'mimes:pdf,doc,docx', 'max:10240',
             ],
             'action' => [$isDraft ? 'required' : 'nullable', 'in:draft,submit'],
+            'co_authors' => ['nullable', 'array'],
+            'co_authors.*.full_name' => ['nullable', 'string', 'max:150'],
+            'co_authors.*.email' => ['nullable', 'email', 'max:150'],
+            'co_authors.*.affiliation' => ['nullable', 'string', 'max:255'],
+            'co_authors.*.orcid' => ['nullable', 'string', 'max:50'],
         ]);
 
         $data['abstract'] = Purifier::clean($data['abstract'], 'manuscript_abstract');
+
+        $coAuthors = $data['co_authors'] ?? [];
+        unset($data['co_authors']);
 
         if ($request->hasFile('manuscript_file')) {
             if ($manuscript->manuscript_file) {
@@ -204,6 +235,8 @@ class ManuscriptController extends Controller
                 'updated_by' => Auth::id(),
             ]);
 
+            $this->syncCoAuthors($manuscript, $coAuthors);
+
             if ($isSubmit) {
                 $this->notifyPermissionHolders('journal', 'screen-submissions', new AppNotification(
                     title: 'New manuscript submitted',
@@ -223,7 +256,7 @@ class ManuscriptController extends Controller
                 ->with('success', $message);
         }
 
-        DB::transaction(function () use ($manuscript, $data) {
+        DB::transaction(function () use ($manuscript, $data, $coAuthors) {
             $wasDeskRejectedOrRejected = in_array($manuscript->status, ['desk_rejected', 'rejected']);
             $wasRevisionRequested = $manuscript->status === 'revision_requested';
 
@@ -244,6 +277,8 @@ class ManuscriptController extends Controller
                 'editor_decision_notes' => null,
                 'updated_by' => Auth::id(),
             ]);
+
+            $this->syncCoAuthors($manuscript, $coAuthors);
 
             if ($wasRevisionRequested) {
                 // Same reviewers, fresh round on the revised file —
@@ -641,7 +676,7 @@ class ManuscriptController extends Controller
      * its DOI. (Placeholder DOI format — swap in a real Crossref/DOI
      * registration call here when that integration is built.)
      */
-    public function publish(Manuscript $manuscript)
+    public function publish(Request $request, Manuscript $manuscript)
     {
         $this->authorizePermission('manage-workflow');
 
@@ -659,9 +694,21 @@ class ManuscriptController extends Controller
             'The author has not approved the publication proof yet. Send the proof and wait for their approval before publishing.'
         );
 
+        $data = $request->validate([
+            // Optional: the DOI-stamped version-of-record, if it
+            // differs from the plain proof the author approved (e.g.
+            // a typesetter adds the citation footer after the DOI is
+            // minted). Content must match what was approved — this
+            // is not a way to slip in unapproved changes.
+            'published_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
+        ]);
+
         $manuscript->update([
             'status' => 'published',
             'doi' => $manuscript->doi ?: '10.0000/ora.journal.'.Str::padLeft((string) $manuscript->id, 6, '0'),
+            'published_file' => $request->hasFile('published_file')
+                ? $request->file('published_file')->store('manuscript-published', 'public')
+                : $manuscript->proof_file,
             'published_at' => now(),
             'updated_by' => Auth::id(),
         ]);
@@ -677,6 +724,35 @@ class ManuscriptController extends Controller
         return back()->with('success', 'Manuscript published.');
     }
 
+    /**
+     * Replace a manuscript's co-author rows wholesale — simpler and
+     * safer than diffing against existing IDs for what's normally a
+     * handful of rows, and avoids ever mixing up which row is which
+     * across an add/remove/reorder edit on the form.
+     *
+     * Blank rows (no name typed in) are silently dropped: the author
+     * may have clicked "Add Co-Author" and then changed their mind,
+     * and that shouldn't be a validation error.
+     */
+    protected function syncCoAuthors(Manuscript $manuscript, array $rows): void
+    {
+        $manuscript->coAuthors()->delete();
+
+        collect($rows)
+            ->filter(fn ($row) => filled($row['full_name'] ?? null))
+            ->values()
+            ->each(function (array $row, int $index) use ($manuscript) {
+                ManuscriptCoAuthor::create([
+                    'manuscript_id' => $manuscript->id,
+                    'full_name' => $row['full_name'],
+                    'email' => $row['email'] ?? null,
+                    'affiliation' => $row['affiliation'] ?? null,
+                    'orcid' => $row['orcid'] ?? null,
+                    'position' => $index,
+                ]);
+            });
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Authorization helpers
@@ -689,6 +765,20 @@ class ManuscriptController extends Controller
             || $user->hasModulePermission('journal', 'manage-workflow')
             || $user->hasModulePermission('journal', 'make-final-decision')
             || $user->hasModulePermission('journal', 'screen-submissions');
+    }
+
+    /**
+     * Double-blind peer review gate: true only for someone whose
+     * entire relationship to this module is "Reviewer" — not an
+     * editorial role, not a Super Admin. That's the one role the
+     * author's identity must never reach, since reviewers are meant
+     * to judge the work, not the name attached to it.
+     */
+    protected function isReviewerOnly(User $user): bool
+    {
+        return ! $this->isEditorial($user)
+            && ! $user->isSuperAdmin()
+            && $user->hasModulePermission('journal', 'review-manuscripts');
     }
 
     protected function authorizePermission(string $permission): void

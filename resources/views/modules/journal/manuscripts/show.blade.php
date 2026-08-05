@@ -16,7 +16,11 @@
       <div>
         <h1 class="h3 mb-1">{{ $manuscript->title }}</h1>
         <p class="text-muted mb-0">
-          By {{ $manuscript->author->full_name }} ·
+          @if($blindAuthor)
+            <span class="badge bg-light text-dark border"><i class="bi bi-eye-slash"></i> Author Blinded for Peer Review</span> ·
+          @else
+            By {{ $manuscript->byline() }} ·
+          @endif
           <span class="badge bg-secondary">{{ $manuscript->statusLabel() }}</span>
         </p>
       </div>
@@ -322,8 +326,18 @@
             <div class="card-header"><strong>Publish</strong></div>
             <div class="card-body">
               @if($manuscript->isFeeSettled() && $manuscript->isProofApproved())
-                <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST">
+                <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST" enctype="multipart/form-data">
                   @csrf
+                  <div class="mb-3">
+                    <label class="form-label">DOI-Stamped Version-of-Record (optional)</label>
+                    <input type="file" name="published_file" class="form-control" accept=".pdf,.doc,.docx">
+                    <div class="form-text">
+                      Leave blank to publish the exact proof the author already approved.
+                      Only attach a different file here if it's the same approved content
+                      with the DOI/citation footer added — not a way to slip in changes
+                      the author hasn't seen.
+                    </div>
+                  </div>
                   <button type="submit" class="btn btn-success">
                     <i class="bi bi-globe"></i> Publish & Assign DOI
                   </button>
@@ -360,6 +374,37 @@
       </div>
 
       <div class="col-lg-4">
+        @unless($blindAuthor)
+          <div class="card mb-4">
+            <div class="card-header"><strong>Authors</strong></div>
+            <div class="card-body">
+              <div class="mb-3 pb-3 border-bottom">
+                <div class="fw-semibold">{{ $manuscript->author->full_name }}</div>
+                <div class="text-muted small">Corresponding Author</div>
+                @if($manuscript->author->email)
+                  <div class="text-muted small">{{ $manuscript->author->email }}</div>
+                @endif
+              </div>
+              @forelse($manuscript->coAuthors as $coAuthor)
+                <div class="mb-3 pb-3 {{ ! $loop->last ? 'border-bottom' : '' }}">
+                  <div class="fw-semibold">{{ $coAuthor->full_name }}</div>
+                  @if($coAuthor->affiliation)
+                    <div class="text-muted small">{{ $coAuthor->affiliation }}</div>
+                  @endif
+                  @if($coAuthor->email)
+                    <div class="text-muted small">{{ $coAuthor->email }}</div>
+                  @endif
+                  @if($coAuthor->orcid)
+                    <div class="text-muted small"><i class="bi bi-person-badge"></i> {{ $coAuthor->orcid }}</div>
+                  @endif
+                </div>
+              @empty
+                <p class="text-muted small mb-0">No co-authors listed.</p>
+              @endforelse
+            </div>
+          </div>
+        @endunless
+
         <div class="card">
           <div class="card-header"><strong>Reviews</strong></div>
           <div class="card-body">

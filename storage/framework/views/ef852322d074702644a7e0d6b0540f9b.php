@@ -92,10 +92,17 @@
             <?php elseif($manuscript->status === 'draft'): ?>
               <small class="text-muted">Not required to save the draft — required before you push it for review.</small>
             <?php endif; ?>
+            <div class="form-text">
+              <i class="bi bi-eye-slash"></i>
+              Reviewers never see your name, but they do read this file — keep it free of
+              your name, affiliation, or acknowledgements.
+            </div>
           </div>
 
         </div>
       </div>
+
+      <?php echo $__env->make('modules.journal.manuscripts._co-authors', ['existing' => $manuscript->coAuthors], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
       <div class="d-flex gap-2">
         <?php if($manuscript->status === 'draft'): ?>

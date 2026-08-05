@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Account;
 
 use App\Http\Controllers\Controller;
+use App\Models\Module;
 use App\Notifications\AppNotification;
 use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
@@ -22,7 +23,28 @@ class ProfileController extends Controller
     {
         $user = Auth::user();
 
-        return view('account.profile', compact('user'));
+        // "My Modules" card on the profile page: every module this
+        // user actually holds an active role in — not just the
+        // self-registerable ones (an admin-assigned module still
+        // counts as "joined" here), matching what My Modules ->
+        // Manage Modules shows as already joined.
+        $joinedModuleIds = $user->moduleRoles()
+            ->get()
+            ->pluck('pivot.module_id')
+            ->unique();
+
+        $joinedModules = Module::whereIn('id', $joinedModuleIds)
+            ->active()
+            ->orderBy('name')
+            ->get();
+
+        // How many more self-registerable modules are still available
+        // to join, for the "N more modules available" prompt below.
+        $availableModulesCount = Module::selfRegisterable()
+            ->whereNotIn('id', $joinedModuleIds)
+            ->count();
+
+        return view('account.profile', compact('user', 'joinedModules', 'availableModulesCount'));
     }
 
     public function update(Request $request)

@@ -82,10 +82,17 @@
             @elseif($manuscript->status === 'draft')
               <small class="text-muted">Not required to save the draft — required before you push it for review.</small>
             @endif
+            <div class="form-text">
+              <i class="bi bi-eye-slash"></i>
+              Reviewers never see your name, but they do read this file — keep it free of
+              your name, affiliation, or acknowledgements.
+            </div>
           </div>
 
         </div>
       </div>
+
+      @include('modules.journal.manuscripts._co-authors', ['existing' => $manuscript->coAuthors])
 
       <div class="d-flex gap-2">
         @if($manuscript->status === 'draft')

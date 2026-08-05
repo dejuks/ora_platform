@@ -43,7 +43,14 @@
               <?php $__empty_1 = true; $__currentLoopData = $manuscripts; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $manuscript): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
                 <tr>
                   <td><?php echo e($manuscript->title); ?></td>
-                  <td><?php echo e($manuscript->author->full_name); ?></td>
+                  <td>
+                    <?php if($blindAuthor): ?>
+                      <span class="text-muted"><i class="bi bi-eye-slash"></i> Blinded</span>
+                    <?php else: ?>
+                      <?php echo e($manuscript->author->full_name); ?>
+
+                    <?php endif; ?>
+                  </td>
                   <td><?php echo e($manuscript->associateEditor->full_name ?? '—'); ?></td>
                   <td>
                     <span class="badge bg-secondary"><?php echo e($manuscript->statusLabel()); ?></span>

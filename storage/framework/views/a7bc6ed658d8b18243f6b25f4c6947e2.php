@@ -219,7 +219,7 @@
 
                                 </p>
                                 <p class="small mb-3">
-                                    <?php echo e(\Illuminate\Support\Str::limit($article->abstract, 130)); ?>
+                                    <?php echo e(\Illuminate\Support\Str::limit(strip_tags($article->abstract), 130)); ?>
 
                                 </p>
                                 <a href="<?php echo e(route('journal.public.show', $article)); ?>" class="small">

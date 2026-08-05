@@ -10,38 +10,118 @@
 
     <link href="<?php echo e(asset('vendors/bootstrap/css/bootstrap.min.css')); ?>" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background: #f8fafc; color: #0f172a; }
-
-        .site-header {
-            background: #ffffff;
-            border-bottom: 1px solid #e5e7eb;
-            padding: 18px 0;
+        /* Same design tokens as the rest of the public site
+           (partials.public-top-nav / portal.index) so this page reads
+           as part of the platform, not a separate app. */
+        :root{
+            --ink:        #201510;
+            --navy:       #350f22;
+            --navy-2:     #6d1f49;
+            --gold:       #a5702f;
+            --gold-soft:  #dba75f;
+            --green:      #3c5c2b;
+            --paper:      #fbfaf7;
+            --line:       #e6e0d5;
+            --muted:      #6b625c;
+            --panel:      #f4efe6;
         }
 
-        .site-header h1 { font-size: 1.35rem; font-weight: 700; margin: 0; }
-        .site-header small { color: #64748b; }
+        body{ font-family: 'Inter', sans-serif; background: var(--paper); color: var(--ink); }
+        h1, h2, h3{ font-family: 'Newsreader', serif; }
 
-        .article-paper {
+        .back-link{
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: var(--muted);
+        }
+        .back-link:hover{ color: var(--navy); }
+
+        .breadcrumb-row{ font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+        .breadcrumb-row a{ color: var(--muted); }
+        .breadcrumb-row a:hover{ color: var(--navy); }
+
+        .article-paper{
             background: #fff;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 40px;
-            margin-top: 30px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: clamp(28px, 5vw, 52px);
+            margin-top: 6px;
         }
 
-        .badge-published { background: #dcfce7; color: #166534; font-weight: 600; }
+        .badge-published{ background: #dcfce7; color: #166534; font-weight: 600; }
+        .badge-category{ background: var(--panel); color: var(--navy); font-weight: 600; }
 
-        .meta-row { color: #64748b; font-size: 14px; }
-
-        .site-footer {
-            text-align: center;
-            color: #94a3b8;
-            font-size: 13px;
-            padding: 30px 0;
+        .article-title{
+            font-size: clamp(24px, 3.2vw, 34px);
+            font-weight: 600;
+            line-height: 1.25;
+            margin: 14px 0 22px;
         }
+
+        .meta-grid{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px 28px;
+            padding: 18px 20px;
+            background: var(--panel);
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        .meta-item .label{
+            display: block;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--muted);
+            margin-bottom: 3px;
+        }
+        .meta-item .value{ font-size: 14px; color: var(--ink); font-weight: 500; }
+
+        .keyword-chip{
+            display: inline-block;
+            background: #fff;
+            border: 1px solid var(--line);
+            color: var(--navy);
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin: 0 6px 6px 0;
+        }
+
+        .section-label{
+            font-family: 'Newsreader', serif;
+            font-size: 19px;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .abstract-text{ font-size: 15.5px; line-height: 1.75; color: var(--ink); }
+
+        .btn-navy{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--navy);
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            border-radius: 999px;
+            padding: 12px 24px;
+            border: 1px solid var(--navy);
+            transition: 0.15s ease;
+        }
+        .btn-navy:hover{ background: var(--navy-2); color: #fff; }
+
+        .site-footer{ text-align: center; color: var(--muted); font-size: 13px; padding: 40px 0 30px; }
     </style>
 </head>
 
@@ -49,39 +129,64 @@
 
     <?php echo $__env->make('partials.public-top-nav', ['active' => 'journal'], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
-    <div class="container pt-3">
-        <a href="<?php echo e(route('journal.public.index')); ?>" class="btn btn-outline-secondary btn-sm">
+    <div class="container pt-4">
+        <div class="breadcrumb-row">
+            <a href="<?php echo e(route('portal')); ?>">Home</a> /
+            <a href="<?php echo e(route('journal.public.index')); ?>">Journal</a> /
+            <span><?php echo e(\Illuminate\Support\Str::limit($manuscript->title, 60)); ?></span>
+        </div>
+
+        <a href="<?php echo e(route('journal.public.index')); ?>" class="back-link">
             <i class="bi bi-arrow-left"></i> All Articles
         </a>
     </div>
 
-    <div class="container">
+    <div class="container pb-5">
         <div class="article-paper">
 
-            <span class="badge badge-published mb-3">Published</span>
-            <?php if($manuscript->category): ?>
-                <span class="badge bg-light text-dark border mb-3"><?php echo e($manuscript->category->name); ?></span>
-            <?php endif; ?>
-
-            <h1 class="h3 mb-3"><?php echo e($manuscript->title); ?></h1>
-
-            <div class="meta-row mb-4">
-                <div><strong>Author:</strong> <?php echo e($manuscript->author->full_name); ?></div>
-                <div><strong>Published:</strong> <?php echo e(optional($manuscript->published_at)->format('M d, Y')); ?></div>
-                <?php if($manuscript->doi): ?>
-                    <div><strong>DOI:</strong> <?php echo e($manuscript->doi); ?></div>
-                <?php endif; ?>
-                <?php if($manuscript->keywords): ?>
-                    <div><strong>Keywords:</strong> <?php echo e($manuscript->keywords); ?></div>
+            <div>
+                <span class="badge badge-published">Published</span>
+                <?php if($manuscript->category): ?>
+                    <span class="badge badge-category"><?php echo e($manuscript->category->name); ?></span>
                 <?php endif; ?>
             </div>
 
-            <h5>Abstract</h5>
-            <p><?php echo e($manuscript->abstract); ?></p>
+            <h1 class="article-title"><?php echo e($manuscript->title); ?></h1>
 
-            <?php if($manuscript->manuscript_file): ?>
-                <a href="<?php echo e(\Illuminate\Support\Facades\Storage::url($manuscript->manuscript_file)); ?>"
-                   target="_blank" class="btn btn-primary mt-3">
+            <div class="meta-grid">
+                <div class="meta-item">
+                    <span class="label">Author</span>
+                    <span class="value"><?php echo e($manuscript->author->full_name); ?></span>
+                </div>
+                <div class="meta-item">
+                    <span class="label">Published</span>
+                    <span class="value"><?php echo e(optional($manuscript->published_at)->format('M d, Y')); ?></span>
+                </div>
+                <?php if($manuscript->doi): ?>
+                    <div class="meta-item">
+                        <span class="label">DOI</span>
+                        <span class="value"><?php echo e($manuscript->doi); ?></span>
+                    </div>
+                <?php endif; ?>
+            </div>
+
+            <?php if($manuscript->keywords): ?>
+                <div class="mb-4">
+                    <span class="section-label" style="font-size: 13px; display:block; margin-bottom:8px; font-family: 'Inter', sans-serif; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700;">Keywords</span>
+                    <?php $__currentLoopData = explode(',', $manuscript->keywords); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $keyword): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <span class="keyword-chip"><?php echo e(trim($keyword)); ?></span>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </div>
+            <?php endif; ?>
+
+            <h2 class="section-label">Abstract</h2>
+            
+            <div class="abstract-text"><?php echo $manuscript->abstract; ?></div>
+
+            
+            <?php if($manuscript->publicFile()): ?>
+                <a href="<?php echo e(\Illuminate\Support\Facades\Storage::url($manuscript->publicFile())); ?>"
+                   target="_blank" class="btn-navy mt-3">
                     <i class="bi bi-file-earmark-pdf"></i> Download Full Article
                 </a>
             <?php endif; ?>

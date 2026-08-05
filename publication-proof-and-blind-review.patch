@@ -1,8 +1,33 @@
 diff --git a/app/Http/Controllers/Journal/ManuscriptController.php b/app/Http/Controllers/Journal/ManuscriptController.php
-index 7419c55..fb1b548 100644
+index 7419c55..b918c28 100644
 --- a/app/Http/Controllers/Journal/ManuscriptController.php
 +++ b/app/Http/Controllers/Journal/ManuscriptController.php
-@@ -533,6 +533,109 @@ public function decide(Request $request, Manuscript $manuscript)
+@@ -57,7 +57,12 @@ public function index(Request $request)
+ 
+         $manuscripts = $query->paginate(15)->withQueryString();
+ 
+-        return view('modules.journal.manuscripts.index', compact('manuscripts'));
++        // Double-blind peer review: a plain Reviewer never sees who
++        // wrote what they're reviewing. Editorial roles and the
++        // author themselves still see full identity everywhere.
++        $blindAuthor = $this->isReviewerOnly($user);
++
++        return view('modules.journal.manuscripts.index', compact('manuscripts', 'blindAuthor'));
+     }
+ 
+     public function create()
+@@ -133,7 +138,9 @@ public function show(Manuscript $manuscript)
+             })->get()
+             : collect();
+ 
+-        return view('modules.journal.manuscripts.show', compact('manuscript', 'reviewers'));
++        $blindAuthor = $this->isReviewerOnly(Auth::user());
++
++        return view('modules.journal.manuscripts.show', compact('manuscript', 'reviewers', 'blindAuthor'));
+     }
+ 
+     /**
+@@ -533,12 +540,115 @@ public function decide(Request $request, Manuscript $manuscript)
          return back()->with('success', 'Decision recorded.');
      }
  
@@ -112,7 +137,14 @@ index 7419c55..fb1b548 100644
      /**
       * Journal Manager / EIC: publish an accepted manuscript and mint
       * its DOI. (Placeholder DOI format — swap in a real Crossref/DOI
-@@ -550,6 +653,12 @@ public function publish(Manuscript $manuscript)
+      * registration call here when that integration is built.)
+      */
+-    public function publish(Manuscript $manuscript)
++    public function publish(Request $request, Manuscript $manuscript)
+     {
+         $this->authorizePermission('manage-workflow');
+ 
+@@ -550,9 +660,27 @@ public function publish(Manuscript $manuscript)
              'The publication fee has not been paid yet. The author must complete payment before this manuscript can be published.'
          );
  
@@ -122,14 +154,50 @@ index 7419c55..fb1b548 100644
 +            'The author has not approved the publication proof yet. Send the proof and wait for their approval before publishing.'
 +        );
 +
++        $data = $request->validate([
++            // Optional: the DOI-stamped version-of-record, if it
++            // differs from the plain proof the author approved (e.g.
++            // a typesetter adds the citation footer after the DOI is
++            // minted). Content must match what was approved — this
++            // is not a way to slip in unapproved changes.
++            'published_file' => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
++        ]);
++
          $manuscript->update([
              'status' => 'published',
              'doi' => $manuscript->doi ?: '10.0000/ora.journal.'.Str::padLeft((string) $manuscript->id, 6, '0'),
++            'published_file' => $request->hasFile('published_file')
++                ? $request->file('published_file')->store('manuscript-published', 'public')
++                : $manuscript->proof_file,
+             'published_at' => now(),
+             'updated_by' => Auth::id(),
+         ]);
+@@ -582,6 +710,20 @@ protected function isEditorial(User $user): bool
+             || $user->hasModulePermission('journal', 'screen-submissions');
+     }
+ 
++    /**
++     * Double-blind peer review gate: true only for someone whose
++     * entire relationship to this module is "Reviewer" — not an
++     * editorial role, not a Super Admin. That's the one role the
++     * author's identity must never reach, since reviewers are meant
++     * to judge the work, not the name attached to it.
++     */
++    protected function isReviewerOnly(User $user): bool
++    {
++        return ! $this->isEditorial($user)
++            && ! $user->isSuperAdmin()
++            && $user->hasModulePermission('journal', 'review-manuscripts');
++    }
++
+     protected function authorizePermission(string $permission): void
+     {
+         abort_unless(
 diff --git a/app/Models/Manuscript.php b/app/Models/Manuscript.php
-index 1c90a07..c3edc61 100644
+index 1c90a07..4a776e8 100644
 --- a/app/Models/Manuscript.php
 +++ b/app/Models/Manuscript.php
-@@ -24,6 +24,13 @@ class Manuscript extends Model
+@@ -24,6 +24,14 @@ class Manuscript extends Model
          'publication_fee',
          'payment_status',
          'fee_paid_at',
@@ -140,10 +208,11 @@ index 1c90a07..c3edc61 100644
 +        'proof_sent_by',
 +        'proof_sent_at',
 +        'proof_responded_at',
++        'published_file',
          'submitted_at',
          'decided_at',
          'published_at',
-@@ -38,6 +45,8 @@ protected function casts(): array
+@@ -38,6 +46,8 @@ protected function casts(): array
              'decided_at' => 'datetime',
              'published_at' => 'datetime',
              'fee_paid_at' => 'datetime',
@@ -152,7 +221,7 @@ index 1c90a07..c3edc61 100644
              'publication_fee' => 'decimal:2',
          ];
      }
-@@ -211,6 +220,46 @@ public function isFeeSettled(): bool
+@@ -211,6 +221,61 @@ public function isFeeSettled(): bool
          return $this->publication_fee <= 0 || in_array($this->payment_status, ['paid', 'waived']);
      }
  
@@ -194,6 +263,21 @@ index 1c90a07..c3edc61 100644
 +    public function isProofAwaitingAuthor(): bool
 +    {
 +        return $this->proof_status === 'sent';
++    }
++
++    /**
++     * The one file the public site should ever link to: the
++     * version-of-record. Never manuscript_file (the blind
++     * peer-review copy) — that file is never guaranteed to carry
++     * author details, page numbers, or the DOI footer.
++     *
++     * Falls back to proof_file for manuscripts published before a
++     * separately DOI-stamped file was attached, since the proof is,
++     * by definition, the exact content the author already approved.
++     */
++    public function publicFile(): ?string
++    {
++        return $this->published_file ?: $this->proof_file;
 +    }
 +
      /*
@@ -265,11 +349,129 @@ index 0000000..b4c9788
 +        });
 +    }
 +};
+diff --git a/database/migrations/2026_08_05_000000_add_published_file_to_manuscripts_table.php b/database/migrations/2026_08_05_000000_add_published_file_to_manuscripts_table.php
+new file mode 100644
+index 0000000..8721633
+--- /dev/null
++++ b/database/migrations/2026_08_05_000000_add_published_file_to_manuscripts_table.php
+@@ -0,0 +1,41 @@
++<?php
++
++use Illuminate\Database\Migrations\Migration;
++use Illuminate\Database\Schema\Blueprint;
++use Illuminate\Support\Facades\Schema;
++
++return new class extends Migration
++{
++    /**
++     * The version-of-record is deliberately its own file, distinct
++     * from both manuscript_file (the blind peer-review copy) and
++     * proof_file (the pre-DOI document the author approved):
++     *
++     *   manuscript_file -> what reviewers read (should carry no
++     *                      author-identifying info; blinding is
++     *                      enforced by never showing author metadata
++     *                      to reviewers in the UI, not by editing
++     *                      this file).
++     *   proof_file      -> what the author approved: the typeset
++     *                      document with author details composed
++     *                      back in, before a DOI exists.
++     *   published_file  -> the version-of-record: the same approved
++     *                      content, now carrying the DOI/citation
++     *                      footer. Defaults to proof_file at publish
++     *                      time if the Manager doesn't attach a
++     *                      separately DOI-stamped file.
++     */
++    public function up(): void
++    {
++        Schema::table('manuscripts', function (Blueprint $table) {
++            $table->string('published_file')->nullable()->after('proof_responded_at');
++        });
++    }
++
++    public function down(): void
++    {
++        Schema::table('manuscripts', function (Blueprint $table) {
++            $table->dropColumn('published_file');
++        });
++    }
++};
+diff --git a/resources/views/modules/journal/manuscripts/create.blade.php b/resources/views/modules/journal/manuscripts/create.blade.php
+index 9bb28c1..9b882ec 100644
+--- a/resources/views/modules/journal/manuscripts/create.blade.php
++++ b/resources/views/modules/journal/manuscripts/create.blade.php
+@@ -58,6 +58,18 @@
+           </div>
+ 
+         </div>
++
++        <div class="alert alert-info d-flex gap-2 mt-3">
++          <i class="bi bi-eye-slash mt-1"></i>
++          <div>
++            <strong>This journal uses double-blind peer review.</strong>
++            Reviewers never see your name — but they do read this file, so please remove
++            your name, affiliation, and any acknowledgements that would identify you from
++            the document itself before uploading. Your name and affiliation are captured
++            separately from your account and reappear automatically on the published
++            article; they don't need to be in this file.
++          </div>
++        </div>
+       </div>
+ 
+       <div class="d-flex gap-2">
+diff --git a/resources/views/modules/journal/manuscripts/edit.blade.php b/resources/views/modules/journal/manuscripts/edit.blade.php
+index ddaeeb1..4929689 100644
+--- a/resources/views/modules/journal/manuscripts/edit.blade.php
++++ b/resources/views/modules/journal/manuscripts/edit.blade.php
+@@ -82,6 +82,11 @@
+             @elseif($manuscript->status === 'draft')
+               <small class="text-muted">Not required to save the draft — required before you push it for review.</small>
+             @endif
++            <div class="form-text">
++              <i class="bi bi-eye-slash"></i>
++              Reviewers never see your name, but they do read this file — keep it free of
++              your name, affiliation, or acknowledgements.
++            </div>
+           </div>
+ 
+         </div>
+diff --git a/resources/views/modules/journal/manuscripts/index.blade.php b/resources/views/modules/journal/manuscripts/index.blade.php
+index bf7e27a..161fb36 100644
+--- a/resources/views/modules/journal/manuscripts/index.blade.php
++++ b/resources/views/modules/journal/manuscripts/index.blade.php
+@@ -34,7 +34,13 @@
+               @forelse($manuscripts as $manuscript)
+                 <tr>
+                   <td>{{ $manuscript->title }}</td>
+-                  <td>{{ $manuscript->author->full_name }}</td>
++                  <td>
++                    @if($blindAuthor)
++                      <span class="text-muted"><i class="bi bi-eye-slash"></i> Blinded</span>
++                    @else
++                      {{ $manuscript->author->full_name }}
++                    @endif
++                  </td>
+                   <td>{{ $manuscript->associateEditor->full_name ?? '—' }}</td>
+                   <td>
+                     <span class="badge bg-secondary">{{ $manuscript->statusLabel() }}</span>
 diff --git a/resources/views/modules/journal/manuscripts/show.blade.php b/resources/views/modules/journal/manuscripts/show.blade.php
-index 5d96f13..ed2f23c 100644
+index 5d96f13..d7ca94b 100644
 --- a/resources/views/modules/journal/manuscripts/show.blade.php
 +++ b/resources/views/modules/journal/manuscripts/show.blade.php
-@@ -234,25 +234,113 @@
+@@ -16,7 +16,11 @@
+       <div>
+         <h1 class="h3 mb-1">{{ $manuscript->title }}</h1>
+         <p class="text-muted mb-0">
+-          By {{ $manuscript->author->full_name }} ·
++          @if($blindAuthor)
++            <span class="badge bg-light text-dark border"><i class="bi bi-eye-slash"></i> Author Blinded for Peer Review</span> ·
++          @else
++            By {{ $manuscript->author->full_name }} ·
++          @endif
+           <span class="badge bg-secondary">{{ $manuscript->statusLabel() }}</span>
+         </p>
+       </div>
+@@ -234,25 +238,123 @@
            </div>
          @endif
  
@@ -361,9 +563,20 @@ index 5d96f13..ed2f23c 100644
              <div class="card-header"><strong>Publish</strong></div>
              <div class="card-body">
 -              @if($manuscript->isFeeSettled())
+-                <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST">
 +              @if($manuscript->isFeeSettled() && $manuscript->isProofApproved())
-                 <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST">
++                <form action="{{ route('journal.manuscripts.publish', $manuscript) }}" method="POST" enctype="multipart/form-data">
                    @csrf
++                  <div class="mb-3">
++                    <label class="form-label">DOI-Stamped Version-of-Record (optional)</label>
++                    <input type="file" name="published_file" class="form-control" accept=".pdf,.doc,.docx">
++                    <div class="form-text">
++                      Leave blank to publish the exact proof the author already approved.
++                      Only attach a different file here if it's the same approved content
++                      with the DOI/citation footer added — not a way to slip in changes
++                      the author hasn't seen.
++                    </div>
++                  </div>
                    <button type="submit" class="btn btn-success">
                      <i class="bi bi-globe"></i> Publish & Assign DOI
                    </button>
@@ -385,6 +598,25 @@ index 5d96f13..ed2f23c 100644
                @endif
              </div>
            </div>
+diff --git a/resources/views/modules/journal/public/show.blade.php b/resources/views/modules/journal/public/show.blade.php
+index fb3112e..6e3386a 100644
+--- a/resources/views/modules/journal/public/show.blade.php
++++ b/resources/views/modules/journal/public/show.blade.php
+@@ -182,8 +182,12 @@
+             <h2 class="section-label">Abstract</h2>
+             <p class="abstract-text">{{ $manuscript->abstract }}</p>
+ 
+-            @if($manuscript->manuscript_file)
+-                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->manuscript_file) }}"
++            {{-- Deliberately publicFile(), never manuscript_file: the public
++                 copy must be the version the author approved (and, once
++                 published, the DOI-stamped version-of-record), not the
++                 blinded file that was only ever meant for reviewers. --}}
++            @if($manuscript->publicFile())
++                <a href="{{ \Illuminate\Support\Facades\Storage::url($manuscript->publicFile()) }}"
+                    target="_blank" class="btn-navy mt-3">
+                     <i class="bi bi-file-earmark-pdf"></i> Download Full Article
+                 </a>
 diff --git a/routes/web.php b/routes/web.php
 index 07d45cd..1116321 100644
 --- a/routes/web.php
