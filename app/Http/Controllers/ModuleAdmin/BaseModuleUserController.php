@@ -192,6 +192,8 @@ abstract class BaseModuleUserController extends Controller
             'roles.*' => ['integer'],
         ]);
 
+
+
         $roles = $this->assignableRoles($module)->whereIn('id', $data['roles']);
 
         abort_if($roles->isEmpty(), 422, 'Select at least one valid role.');
