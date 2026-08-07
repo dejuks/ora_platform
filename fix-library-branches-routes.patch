@@ -1,0 +1,24 @@
+diff --git a/routes/web.php b/routes/web.php
+index be64b02..35f16dc 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -32,6 +32,7 @@
+ use App\Http\Controllers\Journal\SettingsController as JournalSettingsController;
+ use App\Http\Controllers\Journal\UserController as JournalUserController;
+ use App\Http\Controllers\Library\BookController as LibraryBookController;
++use App\Http\Controllers\Library\BranchController as LibraryBranchController;
+ use App\Http\Controllers\Library\CategoryController as LibraryCategoryController;
+ use App\Http\Controllers\Library\CirculationController as LibraryCirculationController;
+ use App\Http\Controllers\Library\CirculationPolicyController as LibraryCirculationPolicyController;
+@@ -899,6 +900,11 @@
+ 
+             Route::resource('categories', LibraryCategoryController::class)->except('show');
+ 
++            Route::resource('branches', LibraryBranchController::class)->except('show');
++
++            Route::post('branches/{branch}/staff', [LibraryBranchController::class, 'syncStaff'])
++                ->name('branches.staff');
++
+             Route::get('copies', [LibraryBookController::class, 'copiesIndex'])->name('copies.index');
+ 
+             Route::post('books/{book}/approve-acquisition', [LibraryBookController::class, 'approveAcquisition'])
