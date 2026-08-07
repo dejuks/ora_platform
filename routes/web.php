@@ -32,6 +32,7 @@ use App\Http\Controllers\Journal\PublicController as JournalPublicController;
 use App\Http\Controllers\Journal\SettingsController as JournalSettingsController;
 use App\Http\Controllers\Journal\UserController as JournalUserController;
 use App\Http\Controllers\Library\BookController as LibraryBookController;
+use App\Http\Controllers\Library\BranchController as LibraryBranchController;
 use App\Http\Controllers\Library\CategoryController as LibraryCategoryController;
 use App\Http\Controllers\Library\CirculationController as LibraryCirculationController;
 use App\Http\Controllers\Library\CirculationPolicyController as LibraryCirculationPolicyController;
@@ -898,6 +899,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::resource('books', LibraryBookController::class)->except('destroy');
 
             Route::resource('categories', LibraryCategoryController::class)->except('show');
+
+            Route::resource('branches', LibraryBranchController::class)->except('show');
+
+            Route::post('branches/{branch}/staff', [LibraryBranchController::class, 'syncStaff'])
+                ->name('branches.staff');
 
             Route::get('copies', [LibraryBookController::class, 'copiesIndex'])->name('copies.index');
 
