@@ -8,6 +8,8 @@ use App\Models\BookCategory;
 use App\Models\BookReview;
 use App\Models\EbookSetting;
 use App\Models\User;
+use App\Notifications\AppNotification;
+use App\Support\NotifiesPermissionHolders;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +32,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class BookController extends Controller
 {
+    use NotifiesPermissionHolders;
+
     public function index(Request $request)
     {
         $user = Auth::user();
@@ -390,44 +394,162 @@ class BookController extends Controller
 
     /**
      * Digital Content Manager: convert to PDF/EPUB, assign ISBN/DOI,
-     * set access rights, and publish to the ORA Digital Library.
+     * then send the proof to the author for approval (does NOT
+     * publish yet — see approveProof() / publish() below).
      */
-    public function publish(Request $request, Book $book)
+    public function uploadProof(Request $request, Book $book)
     {
         $this->authorizePermission('convert-and-publish-ebook');
 
-        abort_unless($book->status === 'in_production', 422, 'Only books cleared for production can be published.');
+        abort_unless($book->status === 'in_production', 422, 'Only books cleared for production can have a proof uploaded.');
 
         $data = $request->validate([
             'isbn' => ['nullable', 'string', 'max:32'],
             'ebook_pdf' => ['required', 'file', 'mimes:pdf', 'max:51200'],
             'ebook_epub' => ['nullable', 'file', 'mimes:epub', 'max:51200'],
             'cover_image' => ['nullable', 'image', 'max:5120'],
-            'access_type' => ['required', 'in:open_access,restricted,embargoed'],
-            'embargo_until' => ['nullable', 'required_if:access_type,embargoed', 'date', 'after:today'],
         ]);
+
+        if ($book->ebook_pdf) {
+            Storage::disk('public')->delete($book->ebook_pdf);
+        }
 
         $updates = [
             'isbn' => $data['isbn'] ?: $book->isbn,
             'doi' => $book->doi ?: '10.0000/ora.ebook.'.str_pad((string) $book->id, 6, '0', STR_PAD_LEFT),
             'ebook_pdf' => $request->file('ebook_pdf')->store('books/ebooks', 'public'),
-            'access_type' => $data['access_type'],
-            'embargo_until' => $data['access_type'] === 'embargoed' ? $data['embargo_until'] : null,
             'produced_by' => Auth::id(),
-            'status' => 'published',
-            'published_at' => now(),
+            'status' => 'proof_review',
+            'proof_submitted_at' => now(),
+            'proof_change_notes' => null,
             'updated_by' => Auth::id(),
         ];
 
         if ($request->hasFile('ebook_epub')) {
+            if ($book->ebook_epub) {
+                Storage::disk('public')->delete($book->ebook_epub);
+            }
+
             $updates['ebook_epub'] = $request->file('ebook_epub')->store('books/ebooks', 'public');
         }
 
         if ($request->hasFile('cover_image')) {
+            if ($book->cover_image) {
+                Storage::disk('public')->delete($book->cover_image);
+            }
+
             $updates['cover_image'] = $request->file('cover_image')->store('books/covers', 'public');
         }
 
         $book->update($updates);
+
+        $book->author?->notify(new AppNotification(
+            title: 'Your eBook proof is ready for review',
+            message: "The final production proof for \"{$book->title}\" is ready. ".
+                'Please review it and approve it, or request changes.',
+            url: route('ebook.books.show', $book),
+            icon: 'bi-file-earmark-check',
+            type: 'info',
+        ));
+
+        return back()->with('success', 'Proof sent to the author for approval.');
+    }
+
+    /**
+     * Author: approve the proof (unblocking publish()) or send it
+     * back with notes, which returns the book to Digital Production
+     * so the Digital Content Manager can revise and re-send it via
+     * uploadProof() above.
+     */
+    public function approveProof(Request $request, Book $book)
+    {
+        abort_unless($book->author_id === Auth::id(), 403, 'Only the author can respond to this proof.');
+
+        abort_unless($book->status === 'proof_review', 422, 'There is no proof currently awaiting your review.');
+
+        $book->update([
+            'status' => 'ready_to_publish',
+            'proof_approved_at' => now(),
+            'updated_by' => Auth::id(),
+        ]);
+
+        $this->notifyPermissionHolders('ebook', 'convert-and-publish-ebook', new AppNotification(
+            title: 'eBook proof approved',
+            message: "The author approved the proof for \"{$book->title}\". It's ready to publish.",
+            url: route('ebook.books.show', $book),
+            icon: 'bi-check-circle',
+            type: 'success',
+        ));
+
+        return back()->with('success', 'Thanks — you approved the proof.');
+    }
+
+    /**
+     * Author: send the proof back to the Digital Content Manager with
+     * notes on what needs to change.
+     */
+    public function requestProofChanges(Request $request, Book $book)
+    {
+        abort_unless($book->author_id === Auth::id(), 403, 'Only the author can respond to this proof.');
+
+        abort_unless($book->status === 'proof_review', 422, 'There is no proof currently awaiting your review.');
+
+        $data = $request->validate([
+            'proof_change_notes' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $book->update([
+            'status' => 'in_production',
+            'proof_change_notes' => $data['proof_change_notes'],
+            'updated_by' => Auth::id(),
+        ]);
+
+        $this->notifyPermissionHolders('ebook', 'convert-and-publish-ebook', new AppNotification(
+            title: 'Changes requested on eBook proof',
+            message: "The author requested changes to the proof for \"{$book->title}\".",
+            url: route('ebook.books.show', $book),
+            icon: 'bi-chat-left-text',
+            type: 'warning',
+        ));
+
+        return back()->with('success', 'Your comments were sent to the Digital Content Manager.');
+    }
+
+    /**
+     * Digital Content Manager: set access rights and publish to the
+     * ORA Digital Library — only reachable once the author has
+     * approved the proof via approveProof() above.
+     */
+    public function publish(Request $request, Book $book)
+    {
+        $this->authorizePermission('convert-and-publish-ebook');
+
+        abort_unless(
+            $book->status === 'ready_to_publish',
+            422,
+            'The author has not approved the proof yet. Send the proof and wait for their approval before publishing.'
+        );
+
+        $data = $request->validate([
+            'access_type' => ['required', 'in:open_access,restricted,embargoed'],
+            'embargo_until' => ['nullable', 'required_if:access_type,embargoed', 'date', 'after:today'],
+        ]);
+
+        $book->update([
+            'access_type' => $data['access_type'],
+            'embargo_until' => $data['access_type'] === 'embargoed' ? $data['embargo_until'] : null,
+            'status' => 'published',
+            'published_at' => now(),
+            'updated_by' => Auth::id(),
+        ]);
+
+        $book->author?->notify(new AppNotification(
+            title: 'eBook published',
+            message: "\"{$book->title}\" has been published to the ORA Digital Library.",
+            url: route('ebook.books.show', $book),
+            icon: 'bi-globe',
+            type: 'success',
+        ));
 
         return back()->with('success', 'eBook published to the ORA Digital Library.');
     }
