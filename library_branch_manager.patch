@@ -1,0 +1,490 @@
+diff --git a/app/Http/Controllers/Library/UserController.php b/app/Http/Controllers/Library/UserController.php
+index a57805c..a12fc76 100644
+--- a/app/Http/Controllers/Library/UserController.php
++++ b/app/Http/Controllers/Library/UserController.php
+@@ -3,8 +3,52 @@
+ namespace App\Http\Controllers\Library;
+ 
+ use App\Http\Controllers\ModuleAdmin\BaseModuleUserController;
++use App\Models\LibraryBranch;
++use App\Models\User;
+ 
+ class UserController extends BaseModuleUserController
+ {
+     protected string $moduleCode = 'library';
++
++    protected function extraValidationRules(): array
++    {
++        return [
++            'branch_id' => ['nullable', 'integer', 'exists:library_branches,id'],
++        ];
++    }
++
++    protected function extraIndexRelations(): array
++    {
++        return ['libraryBranches'];
++    }
++
++    protected function extraFormData(?User $user = null): array
++    {
++        return [
++            'branches' => LibraryBranch::active()->orderBy('name')->get(),
++            'assignedBranchId' => $user?->libraryBranch()?->id,
++        ];
++    }
++
++    protected function extraShowData(User $user): array
++    {
++        return [
++            'branch' => $user->libraryBranch(),
++        ];
++    }
++
++    /**
++     * One branch per user (see library/admin/users): a branch_id
++     * present in the request replaces whatever was assigned before;
++     * an empty one clears it, leaving the user unscoped (every
++     * branch) per User::accessibleLibraryBranchIds().
++     */
++    protected function afterUserSaved(User $user, array $data): void
++    {
++        $branchId = $data['branch_id'] ?? null;
++
++        $user->libraryBranches()->sync(
++            $branchId ? [$branchId => ['assigned_by' => auth()->id()]] : []
++        );
++    }
+ }
+\ No newline at end of file
+diff --git a/app/Http/Controllers/ModuleAdmin/BaseModuleUserController.php b/app/Http/Controllers/ModuleAdmin/BaseModuleUserController.php
+index dcd60b8..0b2b4d5 100644
+--- a/app/Http/Controllers/ModuleAdmin/BaseModuleUserController.php
++++ b/app/Http/Controllers/ModuleAdmin/BaseModuleUserController.php
+@@ -45,6 +45,61 @@ protected function assignableRoles(Module $module)
+             ->get();
+     }
+ 
++    /*
++    |--------------------------------------------------------------------------
++    | Extension hooks
++    |--------------------------------------------------------------------------
++    |
++    | No-op by default. A module whose "Manage Users" screen needs an
++    | extra field beyond the generic account/role fields (e.g. Library
++    | branch assignment) overrides these instead of re-implementing
++    | the whole CRUD flow.
++    |
++    */
++
++    /**
++     * Extra validation rules merged into store()/update().
++     */
++    protected function extraValidationRules(): array
++    {
++        return [];
++    }
++
++    /**
++     * Relations to eager-load on the index() listing (e.g.
++     * 'libraryBranches') beyond the module roles already loaded.
++     */
++    protected function extraIndexRelations(): array
++    {
++        return [];
++    }
++
++    /**
++     * Extra view data merged into create()/edit().
++     */
++    protected function extraFormData(?User $user = null): array
++    {
++        return [];
++    }
++
++    /**
++     * Extra view data merged into show().
++     */
++    protected function extraShowData(User $user): array
++    {
++        return [];
++    }
++
++    /**
++     * Called after the user record and module roles are saved, inside
++     * the same DB transaction, with the validated request data
++     * (module-specific keys included).
++     */
++    protected function afterUserSaved(User $user, array $data): void
++    {
++        //
++    }
++
+     /**
+      * List every distinct user holding at least one role in this
+      * module, along with which role(s) they hold here.
+@@ -59,6 +114,7 @@ public function index(Request $request)
+             ->with(['moduleRoles' => function ($query) use ($module) {
+                 $query->where('roles.module_id', $module->id);
+             }])
++            ->when($this->extraIndexRelations(), fn ($query, $relations) => $query->with($relations))
+             ->when($request->filled('search'), function ($query) use ($request) {
+                 $search = $request->search;
+ 
+@@ -84,18 +140,18 @@ public function create()
+     {
+         $module = $this->module();
+ 
+-        return view('module-admin.users.create', [
++        return view('module-admin.users.create', array_merge([
+             'module' => $module,
+             'moduleCode' => $this->moduleCode,
+             'roles' => $this->assignableRoles($module),
+-        ]);
++        ], $this->extraFormData()));
+     }
+ 
+     public function store(Request $request)
+     {
+         $module = $this->module();
+ 
+-        $data = $request->validate([
++        $data = $request->validate(array_merge([
+             'employee_no' => ['nullable', 'string', 'max:50'],
+             'first_name' => ['required', 'string', 'max:100'],
+             'middle_name' => ['nullable', 'string', 'max:100'],
+@@ -109,7 +165,7 @@ public function store(Request $request)
+             'status' => ['required', 'in:Active,Inactive'],
+             'roles' => ['required', 'array', 'min:1'],
+             'roles.*' => ['integer'],
+-        ]);
++        ], $this->extraValidationRules()));
+ 
+         $roles = $this->assignableRoles($module)->whereIn('id', $data['roles']);
+ 
+@@ -117,13 +173,15 @@ public function store(Request $request)
+ 
+         DB::transaction(function () use ($data, $module, $roles) {
+ 
+-            $data['password'] = Hash::make($data['password']);
+-            $data['is_super_admin'] = false;
+-            $data['created_by'] = auth()->id();
++            $userData = $data;
++            $userData['password'] = Hash::make($userData['password']);
++            $userData['is_super_admin'] = false;
++            $userData['created_by'] = auth()->id();
+ 
+-            unset($data['roles']);
++            unset($userData['roles']);
++            $userData = array_diff_key($userData, array_flip(array_keys($this->extraValidationRules())));
+ 
+-            $user = User::create($data);
++            $user = User::create($userData);
+ 
+             $sync = [];
+ 
+@@ -132,6 +190,8 @@ public function store(Request $request)
+             }
+ 
+             $user->moduleRoles()->attach($sync);
++
++            $this->afterUserSaved($user, $data);
+         });
+ 
+         return redirect()
+@@ -145,12 +205,12 @@ public function show(User $user)
+ 
+         $this->authorizeBelongsToModule($user);
+ 
+-        return view('module-admin.users.show', [
++        return view('module-admin.users.show', array_merge([
+             'module' => $module,
+             'moduleCode' => $this->moduleCode,
+             'user' => $user,
+             'roles' => $user->rolesInModule($this->moduleCode),
+-        ]);
++        ], $this->extraShowData($user)));
+     }
+ 
+     public function edit(User $user)
+@@ -161,13 +221,13 @@ public function edit(User $user)
+ 
+         $assignedRoleIds = $user->rolesInModule($this->moduleCode)->pluck('id')->all();
+ 
+-        return view('module-admin.users.edit', [
++        return view('module-admin.users.edit', array_merge([
+             'module' => $module,
+             'moduleCode' => $this->moduleCode,
+             'user' => $user,
+             'roles' => $this->assignableRoles($module),
+             'assignedRoleIds' => $assignedRoleIds,
+-        ]);
++        ], $this->extraFormData($user)));
+     }
+ 
+     public function update(Request $request, User $user)
+@@ -176,7 +236,7 @@ public function update(Request $request, User $user)
+ 
+         $this->authorizeBelongsToModule($user);
+ 
+-        $data = $request->validate([
++        $data = $request->validate(array_merge([
+             'employee_no' => ['nullable', 'string', 'max:50'],
+             'first_name' => ['required', 'string', 'max:100'],
+             'middle_name' => ['nullable', 'string', 'max:100'],
+@@ -190,25 +250,28 @@ public function update(Request $request, User $user)
+             'status' => ['required', 'in:Active,Inactive'],
+             'roles' => ['required', 'array', 'min:1'],
+             'roles.*' => ['integer'],
+-        ]);
++        ], $this->extraValidationRules()));
+ 
+         $roles = $this->assignableRoles($module)->whereIn('id', $data['roles']);
+ 
+         abort_if($roles->isEmpty(), 422, 'Select at least one valid role.');
+ 
+-        if (! empty($data['password'])) {
+-            $data['password'] = Hash::make($data['password']);
++        $userData = $data;
++
++        if (! empty($userData['password'])) {
++            $userData['password'] = Hash::make($userData['password']);
+         } else {
+-            unset($data['password']);
++            unset($userData['password']);
+         }
+ 
+-        unset($data['roles']);
++        unset($userData['roles']);
++        $userData = array_diff_key($userData, array_flip(array_keys($this->extraValidationRules())));
+ 
+-        $data['updated_by'] = auth()->id();
++        $userData['updated_by'] = auth()->id();
+ 
+-        DB::transaction(function () use ($data, $user, $module, $roles) {
++        DB::transaction(function () use ($userData, $data, $user, $module, $roles) {
+ 
+-            $user->update($data);
++            $user->update($userData);
+ 
+             $user->moduleRoles()->detach($module->roles()->pluck('id'));
+ 
+@@ -219,6 +282,8 @@ public function update(Request $request, User $user)
+             }
+ 
+             $user->moduleRoles()->attach($sync);
++
++            $this->afterUserSaved($user, $data);
+         });
+ 
+         return redirect()
+diff --git a/app/Models/User.php b/app/Models/User.php
+index 1600bd3..cc524ec 100644
+--- a/app/Models/User.php
++++ b/app/Models/User.php
+@@ -225,11 +225,17 @@ public function rolesInModule(string $moduleCode)
+ | Physical Library branch scoping
+ |--------------------------------------------------------------------------
+ |
+-| A Library Manager (manage-settings/manage-users) or Super Admin
+-| always has every branch, full stop. Everyone else is "unscoped"
+-| (every branch) until the Library Manager explicitly assigns them
+-| to one or more specific branches via library_branch_staff — at
+-| that point they're limited to just those.
++| Whether a staff member can act on every branch or just some comes
++| down to ONE thing: do they have any rows in library_branch_staff?
++|
++|   - No rows at all ("unscoped")   -> every branch. This is the
++|     default for a Library Manager, who isn't tied to one location.
++|   - One or more rows ("scoped")   -> only those branches, no matter
++|     what permissions the role carries. A Branch Manager holds the
++|     same permissions as a Library Manager but is always assigned to
++|     a branch, so this is what keeps them fenced to it.
++|
++| Super Admin is the only universal override.
+ |
+ */
+ 
+@@ -244,11 +250,7 @@ public function canAccessLibraryBranch(?int $branchId): bool
+         return true;
+     }
+ 
+-    if (
+-        $this->isSuperAdmin()
+-        || $this->hasModulePermission('library', 'manage-settings')
+-        || $this->hasModulePermission('library', 'manage-users')
+-    ) {
++    if ($this->isSuperAdmin()) {
+         return true;
+     }
+ 
+@@ -266,15 +268,21 @@ public function canAccessLibraryBranch(?int $branchId): bool
+  */
+ public function accessibleLibraryBranchIds(): ?array
+ {
+-    if (
+-        $this->isSuperAdmin()
+-        || $this->hasModulePermission('library', 'manage-settings')
+-        || $this->hasModulePermission('library', 'manage-users')
+-        || ! $this->hasLibraryBranchScope()
+-    ) {
++    if ($this->isSuperAdmin() || ! $this->hasLibraryBranchScope()) {
+         return null;
+     }
+ 
+     return $this->libraryBranches()->pluck('library_branches.id')->all();
+ }
++
++/**
++ * The single branch this staff member is assigned to, or null if
++ * they're unscoped (every branch). The admin/users screen enforces
++ * one branch per user even though library_branch_staff can technically
++ * hold more than one row.
++ */
++public function libraryBranch(): ?LibraryBranch
++{
++    return $this->libraryBranches->first();
++}
+ }
+\ No newline at end of file
+diff --git a/database/seeders/RoleSeeder.php b/database/seeders/RoleSeeder.php
+index a7cbeb7..85c0470 100644
+--- a/database/seeders/RoleSeeder.php
++++ b/database/seeders/RoleSeeder.php
+@@ -111,6 +111,13 @@ protected function seedLibraryRoles(): void
+                 'is_admin_role' => true,
+                 'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions', 'manage-categories', 'manage-payments'],
+             ],
++            [
++                'name' => 'Branch Manager',
++                'slug' => 'branch-manager',
++                'description' => 'Runs day-to-day operations — staff, circulation, inventory, and acquisitions — for a single library branch. Same reach as the Library Manager, scoped to the one branch they\'re assigned to.',
++                'is_admin_role' => true,
++                'permissions' => ['manage-users', 'manage-circulation', 'manage-inventory', 'manage-acquisitions', 'approve-acquisitions'],
++            ],
+             [
+                 'name' => 'Digital Librarian',
+                 'slug' => 'digital-librarian',
+diff --git a/resources/views/module-admin/users/create.blade.php b/resources/views/module-admin/users/create.blade.php
+index 845b093..344364a 100644
+--- a/resources/views/module-admin/users/create.blade.php
++++ b/resources/views/module-admin/users/create.blade.php
+@@ -93,6 +93,27 @@
+         </div>
+       </div>
+ 
++      @if(isset($branches))
++        <div class="card mb-4">
++          <div class="card-header"><strong>Branch</strong></div>
++          <div class="card-body">
++            <label class="form-label">Assigned Branch</label>
++            <select name="branch_id" class="form-select" style="max-width:400px">
++              <option value="">— All branches (unscoped) —</option>
++              @foreach($branches as $branch)
++                <option value="{{ $branch->id }}" @selected((int) old('branch_id') === $branch->id)>
++                  {{ $branch->locationLabel() }}
++                </option>
++              @endforeach
++            </select>
++            <div class="text-muted small mt-1">
++              Leave unset for staff who work across every branch (e.g. the Library Manager).
++              Assigning a branch limits this user — including a Branch Manager — to that branch only.
++            </div>
++          </div>
++        </div>
++      @endif
++
+       <div class="card mb-4">
+         <div class="card-header"><strong>Role in {{ $module->name }} *</strong></div>
+         <div class="card-body row g-2">
+diff --git a/resources/views/module-admin/users/edit.blade.php b/resources/views/module-admin/users/edit.blade.php
+index b700a5b..4d4f475 100644
+--- a/resources/views/module-admin/users/edit.blade.php
++++ b/resources/views/module-admin/users/edit.blade.php
+@@ -95,6 +95,27 @@
+         </div>
+       </div>
+ 
++      @if(isset($branches))
++        <div class="card mb-4">
++          <div class="card-header"><strong>Branch</strong></div>
++          <div class="card-body">
++            <label class="form-label">Assigned Branch</label>
++            <select name="branch_id" class="form-select" style="max-width:400px">
++              <option value="">— All branches (unscoped) —</option>
++              @foreach($branches as $branch)
++                <option value="{{ $branch->id }}" @selected((int) old('branch_id', $assignedBranchId) === $branch->id)>
++                  {{ $branch->locationLabel() }}
++                </option>
++              @endforeach
++            </select>
++            <div class="text-muted small mt-1">
++              Leave unset for staff who work across every branch (e.g. the Library Manager).
++              Assigning a branch limits this user — including a Branch Manager — to that branch only.
++            </div>
++          </div>
++        </div>
++      @endif
++
+       <div class="card mb-4">
+         <div class="card-header"><strong>Role in {{ $module->name }} *</strong></div>
+         <div class="card-body row g-2">
+diff --git a/resources/views/module-admin/users/index.blade.php b/resources/views/module-admin/users/index.blade.php
+index 1c1bba0..8b9ef66 100644
+--- a/resources/views/module-admin/users/index.blade.php
++++ b/resources/views/module-admin/users/index.blade.php
+@@ -32,6 +32,9 @@
+                 <th>Username</th>
+                 <th>Email</th>
+                 <th>Role(s)</th>
++                @if($moduleCode === 'library')
++                  <th>Branch</th>
++                @endif
+                 <th>Status</th>
+                 <th class="text-end">Actions</th>
+               </tr>
+@@ -47,6 +50,15 @@
+                       <span class="badge bg-light text-dark border">{{ $role->name }}</span>
+                     @endforeach
+                   </td>
++                  @if($moduleCode === 'library')
++                    <td>
++                      @if($branch = $user->libraryBranches->first())
++                        <span class="badge bg-info text-dark">{{ $branch->name }}</span>
++                      @else
++                        <span class="text-muted small">All branches</span>
++                      @endif
++                    </td>
++                  @endif
+                   <td>
+                     <span class="badge {{ $user->status === 'Active' ? 'bg-success' : 'bg-secondary' }}">
+                       {{ $user->status }}
+@@ -71,7 +83,7 @@
+                 </tr>
+               @empty
+                 <tr>
+-                  <td colspan="6" class="text-center text-muted py-4">No users in this module yet.</td>
++                  <td colspan="{{ $moduleCode === 'library' ? 7 : 6 }}" class="text-center text-muted py-4">No users in this module yet.</td>
+                 </tr>
+               @endforelse
+             </tbody>
+diff --git a/resources/views/module-admin/users/show.blade.php b/resources/views/module-admin/users/show.blade.php
+index f1f8b40..d8c2546 100644
+--- a/resources/views/module-admin/users/show.blade.php
++++ b/resources/views/module-admin/users/show.blade.php
+@@ -35,6 +35,16 @@
+           <dd class="col-8">
+             <span class="badge {{ $user->status === 'Active' ? 'bg-success' : 'bg-secondary' }}">{{ $user->status }}</span>
+           </dd>
++          @if($moduleCode === 'library')
++            <dt class="col-4">Branch</dt>
++            <dd class="col-8">
++              @if($branch)
++                <span class="badge bg-info text-dark">{{ $branch->name }}</span>
++              @else
++                <span class="text-muted">All branches</span>
++              @endif
++            </dd>
++          @endif
+           <dt class="col-4">Added to {{ $module->name }}</dt>
+           <dd class="col-8">{{ optional($user->created_at)->format('M d, Y') }}</dd>
+           <dt class="col-4">Last Login</dt>

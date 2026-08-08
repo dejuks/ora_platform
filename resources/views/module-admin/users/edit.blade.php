@@ -95,6 +95,27 @@
         </div>
       </div>
 
+      @if(isset($branches))
+        <div class="card mb-4">
+          <div class="card-header"><strong>Branch</strong></div>
+          <div class="card-body">
+            <label class="form-label">Assigned Branch</label>
+            <select name="branch_id" class="form-select" style="max-width:400px">
+              <option value="">— All branches (unscoped) —</option>
+              @foreach($branches as $branch)
+                <option value="{{ $branch->id }}" @selected((int) old('branch_id', $assignedBranchId) === $branch->id)>
+                  {{ $branch->locationLabel() }}
+                </option>
+              @endforeach
+            </select>
+            <div class="text-muted small mt-1">
+              Leave unset for staff who work across every branch (e.g. the Library Manager).
+              Assigning a branch limits this user — including a Branch Manager — to that branch only.
+            </div>
+          </div>
+        </div>
+      @endif
+
       <div class="card mb-4">
         <div class="card-header"><strong>Role in {{ $module->name }} *</strong></div>
         <div class="card-body row g-2">

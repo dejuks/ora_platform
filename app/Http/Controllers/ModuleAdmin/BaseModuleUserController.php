@@ -45,6 +45,61 @@ abstract class BaseModuleUserController extends Controller
             ->get();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Extension hooks
+    |--------------------------------------------------------------------------
+    |
+    | No-op by default. A module whose "Manage Users" screen needs an
+    | extra field beyond the generic account/role fields (e.g. Library
+    | branch assignment) overrides these instead of re-implementing
+    | the whole CRUD flow.
+    |
+    */
+
+    /**
+     * Extra validation rules merged into store()/update().
+     */
+    protected function extraValidationRules(): array
+    {
+        return [];
+    }
+
+    /**
+     * Relations to eager-load on the index() listing (e.g.
+     * 'libraryBranches') beyond the module roles already loaded.
+     */
+    protected function extraIndexRelations(): array
+    {
+        return [];
+    }
+
+    /**
+     * Extra view data merged into create()/edit().
+     */
+    protected function extraFormData(?User $user = null): array
+    {
+        return [];
+    }
+
+    /**
+     * Extra view data merged into show().
+     */
+    protected function extraShowData(User $user): array
+    {
+        return [];
+    }
+
+    /**
+     * Called after the user record and module roles are saved, inside
+     * the same DB transaction, with the validated request data
+     * (module-specific keys included).
+     */
+    protected function afterUserSaved(User $user, array $data): void
+    {
+        //
+    }
+
     /**
      * List every distinct user holding at least one role in this
      * module, along with which role(s) they hold here.
@@ -59,6 +114,7 @@ abstract class BaseModuleUserController extends Controller
             ->with(['moduleRoles' => function ($query) use ($module) {
                 $query->where('roles.module_id', $module->id);
             }])
+            ->when($this->extraIndexRelations(), fn ($query, $relations) => $query->with($relations))
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = $request->search;
 
@@ -84,18 +140,18 @@ abstract class BaseModuleUserController extends Controller
     {
         $module = $this->module();
 
-        return view('module-admin.users.create', [
+        return view('module-admin.users.create', array_merge([
             'module' => $module,
             'moduleCode' => $this->moduleCode,
             'roles' => $this->assignableRoles($module),
-        ]);
+        ], $this->extraFormData()));
     }
 
     public function store(Request $request)
     {
         $module = $this->module();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'employee_no' => ['nullable', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
@@ -109,7 +165,7 @@ abstract class BaseModuleUserController extends Controller
             'status' => ['required', 'in:Active,Inactive'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['integer'],
-        ]);
+        ], $this->extraValidationRules()));
 
         $roles = $this->assignableRoles($module)->whereIn('id', $data['roles']);
 
@@ -117,13 +173,15 @@ abstract class BaseModuleUserController extends Controller
 
         DB::transaction(function () use ($data, $module, $roles) {
 
-            $data['password'] = Hash::make($data['password']);
-            $data['is_super_admin'] = false;
-            $data['created_by'] = auth()->id();
+            $userData = $data;
+            $userData['password'] = Hash::make($userData['password']);
+            $userData['is_super_admin'] = false;
+            $userData['created_by'] = auth()->id();
 
-            unset($data['roles']);
+            unset($userData['roles']);
+            $userData = array_diff_key($userData, array_flip(array_keys($this->extraValidationRules())));
 
-            $user = User::create($data);
+            $user = User::create($userData);
 
             $sync = [];
 
@@ -132,6 +190,8 @@ abstract class BaseModuleUserController extends Controller
             }
 
             $user->moduleRoles()->attach($sync);
+
+            $this->afterUserSaved($user, $data);
         });
 
         return redirect()
@@ -145,12 +205,12 @@ abstract class BaseModuleUserController extends Controller
 
         $this->authorizeBelongsToModule($user);
 
-        return view('module-admin.users.show', [
+        return view('module-admin.users.show', array_merge([
             'module' => $module,
             'moduleCode' => $this->moduleCode,
             'user' => $user,
             'roles' => $user->rolesInModule($this->moduleCode),
-        ]);
+        ], $this->extraShowData($user)));
     }
 
     public function edit(User $user)
@@ -161,13 +221,13 @@ abstract class BaseModuleUserController extends Controller
 
         $assignedRoleIds = $user->rolesInModule($this->moduleCode)->pluck('id')->all();
 
-        return view('module-admin.users.edit', [
+        return view('module-admin.users.edit', array_merge([
             'module' => $module,
             'moduleCode' => $this->moduleCode,
             'user' => $user,
             'roles' => $this->assignableRoles($module),
             'assignedRoleIds' => $assignedRoleIds,
-        ]);
+        ], $this->extraFormData($user)));
     }
 
     public function update(Request $request, User $user)
@@ -176,7 +236,7 @@ abstract class BaseModuleUserController extends Controller
 
         $this->authorizeBelongsToModule($user);
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'employee_no' => ['nullable', 'string', 'max:50'],
             'first_name' => ['required', 'string', 'max:100'],
             'middle_name' => ['nullable', 'string', 'max:100'],
@@ -190,25 +250,28 @@ abstract class BaseModuleUserController extends Controller
             'status' => ['required', 'in:Active,Inactive'],
             'roles' => ['required', 'array', 'min:1'],
             'roles.*' => ['integer'],
-        ]);
+        ], $this->extraValidationRules()));
 
         $roles = $this->assignableRoles($module)->whereIn('id', $data['roles']);
 
         abort_if($roles->isEmpty(), 422, 'Select at least one valid role.');
 
-        if (! empty($data['password'])) {
-            $data['password'] = Hash::make($data['password']);
+        $userData = $data;
+
+        if (! empty($userData['password'])) {
+            $userData['password'] = Hash::make($userData['password']);
         } else {
-            unset($data['password']);
+            unset($userData['password']);
         }
 
-        unset($data['roles']);
+        unset($userData['roles']);
+        $userData = array_diff_key($userData, array_flip(array_keys($this->extraValidationRules())));
 
-        $data['updated_by'] = auth()->id();
+        $userData['updated_by'] = auth()->id();
 
-        DB::transaction(function () use ($data, $user, $module, $roles) {
+        DB::transaction(function () use ($userData, $data, $user, $module, $roles) {
 
-            $user->update($data);
+            $user->update($userData);
 
             $user->moduleRoles()->detach($module->roles()->pluck('id'));
 
@@ -219,6 +282,8 @@ abstract class BaseModuleUserController extends Controller
             }
 
             $user->moduleRoles()->attach($sync);
+
+            $this->afterUserSaved($user, $data);
         });
 
         return redirect()

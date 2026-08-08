@@ -225,11 +225,17 @@ public function rolesInModule(string $moduleCode)
 | Physical Library branch scoping
 |--------------------------------------------------------------------------
 |
-| A Library Manager (manage-settings/manage-users) or Super Admin
-| always has every branch, full stop. Everyone else is "unscoped"
-| (every branch) until the Library Manager explicitly assigns them
-| to one or more specific branches via library_branch_staff — at
-| that point they're limited to just those.
+| Whether a staff member can act on every branch or just some comes
+| down to ONE thing: do they have any rows in library_branch_staff?
+|
+|   - No rows at all ("unscoped")   -> every branch. This is the
+|     default for a Library Manager, who isn't tied to one location.
+|   - One or more rows ("scoped")   -> only those branches, no matter
+|     what permissions the role carries. A Branch Manager holds the
+|     same permissions as a Library Manager but is always assigned to
+|     a branch, so this is what keeps them fenced to it.
+|
+| Super Admin is the only universal override.
 |
 */
 
@@ -244,11 +250,7 @@ public function canAccessLibraryBranch(?int $branchId): bool
         return true;
     }
 
-    if (
-        $this->isSuperAdmin()
-        || $this->hasModulePermission('library', 'manage-settings')
-        || $this->hasModulePermission('library', 'manage-users')
-    ) {
+    if ($this->isSuperAdmin()) {
         return true;
     }
 
@@ -266,15 +268,21 @@ public function canAccessLibraryBranch(?int $branchId): bool
  */
 public function accessibleLibraryBranchIds(): ?array
 {
-    if (
-        $this->isSuperAdmin()
-        || $this->hasModulePermission('library', 'manage-settings')
-        || $this->hasModulePermission('library', 'manage-users')
-        || ! $this->hasLibraryBranchScope()
-    ) {
+    if ($this->isSuperAdmin() || ! $this->hasLibraryBranchScope()) {
         return null;
     }
 
     return $this->libraryBranches()->pluck('library_branches.id')->all();
+}
+
+/**
+ * The single branch this staff member is assigned to, or null if
+ * they're unscoped (every branch). The admin/users screen enforces
+ * one branch per user even though library_branch_staff can technically
+ * hold more than one row.
+ */
+public function libraryBranch(): ?LibraryBranch
+{
+    return $this->libraryBranches->first();
 }
 }
