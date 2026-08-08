@@ -35,6 +35,16 @@
           <dd class="col-8">
             <span class="badge {{ $user->status === 'Active' ? 'bg-success' : 'bg-secondary' }}">{{ $user->status }}</span>
           </dd>
+          @if($moduleCode === 'library')
+            <dt class="col-4">Branch</dt>
+            <dd class="col-8">
+              @if($branch)
+                <span class="badge bg-info text-dark">{{ $branch->name }}</span>
+              @else
+                <span class="text-muted">All branches</span>
+              @endif
+            </dd>
+          @endif
           <dt class="col-4">Added to {{ $module->name }}</dt>
           <dd class="col-8">{{ optional($user->created_at)->format('M d, Y') }}</dd>
           <dt class="col-4">Last Login</dt>

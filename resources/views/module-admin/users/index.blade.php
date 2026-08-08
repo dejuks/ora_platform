@@ -32,6 +32,9 @@
                 <th>Username</th>
                 <th>Email</th>
                 <th>Role(s)</th>
+                @if($moduleCode === 'library')
+                  <th>Branch</th>
+                @endif
                 <th>Status</th>
                 <th class="text-end">Actions</th>
               </tr>
@@ -47,6 +50,15 @@
                       <span class="badge bg-light text-dark border">{{ $role->name }}</span>
                     @endforeach
                   </td>
+                  @if($moduleCode === 'library')
+                    <td>
+                      @if($branch = $user->libraryBranches->first())
+                        <span class="badge bg-info text-dark">{{ $branch->name }}</span>
+                      @else
+                        <span class="text-muted small">All branches</span>
+                      @endif
+                    </td>
+                  @endif
                   <td>
                     <span class="badge {{ $user->status === 'Active' ? 'bg-success' : 'bg-secondary' }}">
                       {{ $user->status }}
@@ -71,7 +83,7 @@
                 </tr>
               @empty
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">No users in this module yet.</td>
+                  <td colspan="{{ $moduleCode === 'library' ? 7 : 6 }}" class="text-center text-muted py-4">No users in this module yet.</td>
                 </tr>
               @endforelse
             </tbody>

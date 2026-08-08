@@ -112,6 +112,13 @@ class RoleSeeder extends Seeder
                 'permissions' => ['manage-users', 'manage-roles', 'manage-settings', 'manage-circulation-policy', 'approve-acquisitions', 'manage-categories', 'manage-payments'],
             ],
             [
+                'name' => 'Branch Manager',
+                'slug' => 'branch-manager',
+                'description' => 'Runs day-to-day operations — staff, circulation, inventory, and acquisitions — for a single library branch. Same reach as the Library Manager, scoped to the one branch they\'re assigned to.',
+                'is_admin_role' => true,
+                'permissions' => ['manage-users', 'manage-circulation', 'manage-inventory', 'manage-acquisitions', 'approve-acquisitions'],
+            ],
+            [
                 'name' => 'Digital Librarian',
                 'slug' => 'digital-librarian',
                 'description' => 'Uploads and manages digital content, ensures metadata accuracy, organizes digital collections, monitors usage statistics.',
